@@ -429,6 +429,13 @@ function clientVersion() {
   try { cachedVersion = crypto.createHash('sha1').update(fs.readFileSync(path.join(clientDist, 'index.html'))).digest('hex').slice(0, 10); } catch { cachedVersion = 'dev'; }
   return cachedVersion;
 }
+// When the web client is rebuilt, tell every open app right away so it reloads.
+fs.watchFile(path.join(clientDist, 'index.html'), { interval: 3000 }, () => {
+  cachedVersion = null;
+  const msg = JSON.stringify({ t: 'hello', version: clientVersion() });
+  for (const ws of wss.clients) if (ws.readyState === 1) ws.send(msg);
+  console.log('[blob] web client rebuilt, version', cachedVersion);
+});
 
 // Auto-update: if this folder is a GitHub clone, check for a new version every 5 minutes.
 // If there is one, exit with code 42 — "Start Blob Server.bat" pulls, rebuilds and restarts.
