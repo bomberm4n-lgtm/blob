@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { api } from './api';
+import { TagBadges } from './Tags';
 import { Avatar, Icon, Tooltip, fmtTime } from './ui';
 
 const QUICK = ['👍', '😂', '❤️', '🔥', '😮', '😢', '💀', '🤡', '👀', '🎉', '😡', '🙏'];
@@ -43,7 +44,7 @@ function Attachment({ a }) {
   );
 }
 
-export default function Chat({ channel, server, me, messages, setMessages, typingNames, socket, members, toggleMembers, showMembers }) {
+export default function Chat({ channel, server, me, usersById, messages, setMessages, typingNames, socket, members, toggleMembers, showMembers }) {
   const [text, setText] = useState('');
   const [file, setFile] = useState(null);
   const [editing, setEditing] = useState(null);
@@ -169,6 +170,7 @@ export default function Chat({ channel, server, me, messages, setMessages, typin
                       {!(grouped && !newDay) && (
                         <div className="msg-head">
                           <span className="msg-author" style={{ color: m.color }}>{m.username}</span>
+                          <TagBadges user={usersById?.[m.user_id]} server={server} />
                           <span className="msg-time">{fmtTime(m.created_at)}</span>
                         </div>
                       )}

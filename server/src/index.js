@@ -114,7 +114,11 @@ function bootstrap(uid) {
   const servers = db.prepare('SELECT s.* FROM servers s JOIN members m ON m.server_id=s.id WHERE m.user_id=? ORDER BY s.id').all(uid).map((s) => ({
     ...s,
     channels: db.prepare('SELECT * FROM channels WHERE server_id=? ORDER BY position, id').all(s.id),
-    members: db.prepare('SELECT u.* FROM users u JOIN members m ON m.user_id=u.id WHERE m.server_id=? ORDER BY u.username').all(s.id).map(publicUser),
+    members: db.prepare('SELECT u.* FROM users u JOIN members m ON m.user_id=u.id WHERE m.server_id=? ORDER BY u.username').all(s.id).map((u) => ({
+      ...publicUser(u),
+      tags: db.prepare('SELECT ut.tag_id FROM user_tags ut JOIN tags t ON t.id=ut.tag_id WHERE t.server_id=? AND ut.user_id=? ORDER BY ut.tag_id').all(s.id, u.id).map((r) => r.tag_id),
+    })),
+    tags: db.prepare('SELECT * FROM tags WHERE server_id=? ORDER BY id').all(s.id),
     sounds: db.prepare('SELECT * FROM sounds WHERE server_id=? ORDER BY id').all(s.id),
   }));
   const presence = Object.fromEntries([...sockets.keys()].map((id) => [id, shownPresence(id)]).filter(([, st]) => st !== 'offline'));
@@ -269,6 +273,67 @@ app.post('/api/servers/:id/leave', auth, (req, res) => {
   db.prepare('DELETE FROM members WHERE server_id=? AND user_id=?').run(sid, req.uid);
   broadcastServer(sid, { t: 'refresh' });
   sendTo(req.uid, { t: 'refresh' });
+  res.json({ ok: true });
+});
+
+// ---------- Member tags (created and handed out by the server owner) ----------
+db.exec(`
+CREATE TABLE IF NOT EXISTS tags (id INTEGER PRIMARY KEY, server_id INTEGER NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+  name TEXT NOT NULL, icon TEXT NOT NULL, color TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS user_tags (tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, PRIMARY KEY (tag_id, user_id));
+`);
+const TAG_ICONS = ['poop', 'crown', 'muscle', 'gamepad', 'surf', 'bald', 'monkey', 'slime'];
+function cleanTag(body) {
+  const name = String(body?.name || '').trim().slice(0, 24);
+  const icon = TAG_ICONS.includes(body?.icon) ? body.icon : null;
+  const color = /^#[0-9a-f]{6}$/i.test(body?.color || '') ? body.color : '#3ecf8e';
+  return { name, icon, color };
+}
+// Returns the tag + its server if the caller owns that server.
+function ownedTag(req, res) {
+  const tag = db.prepare('SELECT * FROM tags WHERE id=?').get(req.params.tagId);
+  const s = tag && db.prepare('SELECT * FROM servers WHERE id=?').get(tag.server_id);
+  if (!s || s.owner_id !== req.uid) { fail(res, 403, 'Only the server owner can manage tags'); return null; }
+  return { tag, s };
+}
+app.post('/api/servers/:id/tags', auth, (req, res) => {
+  const s = db.prepare('SELECT * FROM servers WHERE id=?').get(req.params.id);
+  if (!s || s.owner_id !== req.uid) return fail(res, 403, 'Only the server owner can manage tags');
+  const t = cleanTag(req.body);
+  if (!t.name) return fail(res, 400, 'Name is empty');
+  if (!t.icon) return fail(res, 400, 'Pick an icon');
+  db.prepare('INSERT INTO tags (server_id, name, icon, color) VALUES (?,?,?,?)').run(s.id, t.name, t.icon, t.color);
+  broadcastServer(s.id, { t: 'refresh' });
+  res.json({ ok: true });
+});
+app.patch('/api/tags/:tagId', auth, (req, res) => {
+  const o = ownedTag(req, res); if (!o) return;
+  const t = cleanTag({ ...o.tag, ...req.body });
+  if (!t.name || !t.icon) return fail(res, 400, 'Name and icon are required');
+  db.prepare('UPDATE tags SET name=?, icon=?, color=? WHERE id=?').run(t.name, t.icon, t.color, o.tag.id);
+  broadcastServer(o.s.id, { t: 'refresh' });
+  res.json({ ok: true });
+});
+app.delete('/api/tags/:tagId', auth, (req, res) => {
+  const o = ownedTag(req, res); if (!o) return;
+  db.prepare('DELETE FROM tags WHERE id=?').run(o.tag.id);
+  broadcastServer(o.s.id, { t: 'refresh' });
+  res.json({ ok: true });
+});
+// Give (PUT) or take away (DELETE) a tag from a member.
+app.put('/api/tags/:tagId/users/:userId', auth, (req, res) => {
+  const o = ownedTag(req, res); if (!o) return;
+  const uid = Number(req.params.userId);
+  if (!isMember(o.s.id, uid)) return fail(res, 404, 'Not a member of this server');
+  db.prepare('INSERT OR IGNORE INTO user_tags VALUES (?,?)').run(o.tag.id, uid);
+  broadcastServer(o.s.id, { t: 'refresh' });
+  res.json({ ok: true });
+});
+app.delete('/api/tags/:tagId/users/:userId', auth, (req, res) => {
+  const o = ownedTag(req, res); if (!o) return;
+  db.prepare('DELETE FROM user_tags WHERE tag_id=? AND user_id=?').run(o.tag.id, Number(req.params.userId));
+  broadcastServer(o.s.id, { t: 'refresh' });
   res.json({ ok: true });
 });
 

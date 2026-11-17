@@ -5,6 +5,7 @@ import { Avatar, ContextMenu, Icon, Modal, Slider, Tooltip, useVoice } from './u
 import Chat from './Chat';
 import VoiceView from './VoiceView';
 import { SettingsModal, ShareModal, Soundboard } from './Settings';
+import { AssignTags, ManageTagsModal, TagBadges, TagPills } from './Tags';
 
 export default function App() {
   const [data, setData] = useState(null);
@@ -186,6 +187,7 @@ export default function App() {
                           onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, type: 'user', user: u }); }}>
                           <Avatar user={u} size={24} speaking={speaking} />
                           <span className={speaking ? 'speaking-name' : ''}>{u?.username}</span>
+                          <TagBadges user={u} server={server} size={14} />
                           <span className="voice-user-icons">
                             {st.streaming && <span className="live-badge">LIVE</span>}
                             {st.video && <Icon name="cam" size={14} />}
@@ -287,7 +289,7 @@ export default function App() {
 
       {ctx && (
         <ContextMenu x={ctx.x} y={ctx.y} onClose={() => setCtx(null)}>
-          <CtxContent ctx={ctx} me={me} close={() => setCtx(null)} setModal={setModal} />
+          <CtxContent ctx={ctx} me={me} server={server} close={() => setCtx(null)} setModal={setModal} />
         </ContextMenu>
       )}
 
@@ -299,6 +301,7 @@ export default function App() {
       {modal?.type === 'addChannel' && <AddChannelModal server={server} kind={modal.kind} onClose={() => setModal(null)} />}
       {modal?.type === 'invite' && <InviteModal server={modal.server} onClose={() => setModal(null)} />}
       {modal?.type === 'rename' && <RenameModal {...modal} onClose={() => setModal(null)} />}
+      {modal?.type === 'tags' && server && <ManageTagsModal server={server} onClose={() => setModal(null)} />}
     </div>
   );
 }
@@ -356,7 +359,7 @@ function MemberList({ server, presence, voiceStates, onUser }) {
     <div key={u.id} className={'member' + (isOn ? '' : ' offline')} onClick={(e) => onUser(e, u)} onContextMenu={(e) => { e.preventDefault(); onUser(e, u); }}>
       <Avatar user={u} size={32} status={statusOf(u)} />
       <div className="member-names">
-        <span style={{ color: isOn ? u.color : undefined }}>{u.username}{u.id === server.owner_id && ' 👑'}</span>
+        <span className="member-name" style={{ color: isOn ? u.color : undefined }}>{u.username}{u.id === server.owner_id && ' 👑'}<TagBadges user={u} server={server} /></span>
         {voiceStates[u.id] ? <small>🔊 In a call{voiceStates[u.id].streaming && ' • streaming'}</small> : u.status && <small>{u.status}</small>}
       </div>
     </div>
@@ -371,7 +374,7 @@ function MemberList({ server, presence, voiceStates, onUser }) {
   );
 }
 
-function CtxContent({ ctx, me, close, setModal }) {
+function CtxContent({ ctx, me, server, close, setModal }) {
   const v = useVoice();
   if (ctx.type === 'server') {
     const s = ctx.server;
@@ -380,6 +383,7 @@ function CtxContent({ ctx, me, close, setModal }) {
       <>
         <div className="ctx-item" onClick={() => { setModal({ type: 'invite', server: s }); close(); }}>Invite people</div>
         {owner && <div className="ctx-item" onClick={() => { setModal({ type: 'rename', what: 'server', item: s }); close(); }}>Rename server</div>}
+        {owner && <div className="ctx-item" onClick={() => { setModal({ type: 'tags' }); close(); }}>Member tags</div>}
         {owner && (
           <label className="ctx-item">Change icon
             <input type="file" accept="image/*" hidden onChange={async (e) => {
@@ -405,7 +409,8 @@ function CtxContent({ ctx, me, close, setModal }) {
     );
   }
   if (ctx.type === 'user') {
-    const u = ctx.user;
+    // Look the user up again so tag changes show up right away while the menu is open.
+    const u = server?.members.find((m) => m.id === ctx.user?.id) || ctx.user;
     if (!u) return null;
     const id = String(u.id);
     const isMe = u.id === me.id;
@@ -416,7 +421,14 @@ function CtxContent({ ctx, me, close, setModal }) {
           <Avatar user={u} size={64} />
           <strong>{u.username}</strong>
           {u.status && <small>{u.status}</small>}
+          <TagPills user={u} server={server} />
         </div>
+        {server && server.owner_id === me.id && (
+          <>
+            <div className="ctx-sep" />
+            <AssignTags user={u} server={server} onManage={() => { setModal({ type: 'tags' }); close(); }} />
+          </>
+        )}
         {!isMe && (
           <>
             <div className="ctx-sep" />
