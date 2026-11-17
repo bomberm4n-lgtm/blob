@@ -188,7 +188,9 @@ export function createAutoThreshold(windowSize = 150) {
 
 // thresholdDb can be a number or a function (read on every check, so slider changes apply instantly).
 // auto(): when true, the threshold comes from the noise-floor tracker instead.
-export function startSpeakingDetector(mediaStreamTrack, onChange, { thresholdDb = -50, releaseMs = 50, auto = () => false } = {}) {
+// Turns on only for voice; while you're talking it stays on through consonants and short gaps
+// (loud enough + voice heard in the last 600 ms), then turns off ~120 ms after you go quiet.
+export function startSpeakingDetector(mediaStreamTrack, onChange, { thresholdDb = -50, releaseMs = 120, auto = () => false } = {}) {
   const limit = typeof thresholdDb === 'function' ? thresholdDb : () => thresholdDb;
   const autoThr = createAutoThreshold();
   let warm = 0; // ignore the first ~0.3 s while the noise level is being learned
@@ -200,14 +202,19 @@ export function startSpeakingDetector(mediaStreamTrack, onChange, { thresholdDb 
   const check = createVoiceCheck(an);
   let on = false;
   let lastLoud = 0;
+  let lastVoice = -1e9;
   const id = setInterval(() => {
     if (ctx.state === 'suspended') ctx.resume().catch(() => {});
     const { db, voice } = check();
     const now = performance.now();
     const a = autoThr(db);
     warm++;
-    if (voice && db > (auto() ? (warm < 15 ? Infinity : a) : limit())) lastLoud = now;
-    const next = now - lastLoud < releaseMs;
+    const loud = db > (auto() ? (warm < 15 ? Infinity : a) : limit());
+    if (loud) lastLoud = now;
+    if (loud && voice) lastVoice = now;
+    // In the middle of a sentence (voice in the last 0.8 s), bridge the gaps between words (~280 ms).
+    const midSentence = now - lastVoice < 800;
+    const next = now - lastVoice < releaseMs || (midSentence && now - lastLoud < 280);
     if (next !== on) { on = next; onChange(on); }
   }, 20);
   return () => { clearInterval(id); ctx.close().catch(() => {}); if (on) onChange(false); };
