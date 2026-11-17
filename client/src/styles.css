@@ -557,3 +557,10 @@ kbd { background: var(--bg-0); padding: 4px 10px; border-radius: 6px; font-famil
 .call-timer { margin-left: auto; margin-right: 6px; font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 600; color: var(--text-2); }
 .voice-conn .call-timer + .ping { margin-left: 0; }
 .ch-away { width: 20px; text-align: center; font-size: 14px; opacity: .8; }
+
+/* Mic test meters */
+.mic-meters { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 8px; background: var(--bg-2); }
+.mic-meter-row { display: grid; grid-template-columns: 170px minmax(0, 1fr) 70px; align-items: center; gap: 10px; font-size: 13px; color: var(--text-2); }
+.mic-meter-row b { font-variant-numeric: tabular-nums; text-align: right; color: var(--text); font-weight: 600; }
+.meter-fill.raw { background: var(--text-3); }
+.meter-fill.live { box-shadow: 0 0 8px var(--accent); }

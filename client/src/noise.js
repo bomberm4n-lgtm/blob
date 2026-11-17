@@ -39,8 +39,10 @@ export class BlobMicProcessor {
     const ctx = new AudioContext({ sampleRate: 48000 });
     this.ctx = ctx;
     const src = ctx.createMediaStreamSource(new MediaStream([track]));
+    this.mode = s.noise === 'off' || s.noise === 'browser' ? s.noise : null;
     this.gain = ctx.createGain();
     this.gain.gain.value = s.inputGain ?? 1;
+    this.preAi = this.gain; // mic after the input volume, before any noise removal
     let node = src;
     node.connect(this.gain);
     node = this.gain;
@@ -48,29 +50,40 @@ export class BlobMicProcessor {
     if (s.noise === 'deepfilter') {
       try {
         const [wasmModule] = await Promise.all([getDfModule(), ctx.audioWorklet.addModule('/dfn/worklet.js')]);
-        this.dfn = new AudioWorkletNode(ctx, 'deepfilternet-processor', {
+        const dfn = new AudioWorkletNode(ctx, 'deepfilternet-processor', {
           numberOfInputs: 1, numberOfOutputs: 1, channelCount: 1, channelCountMode: 'explicit',
           processorOptions: { wasmModule, attenuationLimit: s.dfAtten ?? 100 },
         });
-        node.connect(this.dfn);
-        node = this.dfn;
+        // The worklet tells us if the AI really started; if not it would pass raw (noisy) audio through.
+        const status = await new Promise((resolve) => {
+          const timer = setTimeout(() => resolve({ type: 'blob-timeout' }), 4000);
+          dfn.port.onmessage = (e) => { if (e.data?.type?.startsWith('blob-')) { clearTimeout(timer); resolve(e.data); } };
+        });
+        if (status.type !== 'blob-ready') throw new Error('DeepFilterNet did not start: ' + (status.message || status.type));
+        this.dfn = dfn;
+        node.connect(dfn);
+        node = dfn;
+        this.mode = 'deepfilter';
       } catch (err) {
         console.warn('DeepFilterNet failed, falling back to RNNoise', err);
         useRnnoise = true;
       }
     }
     if (useRnnoise) {
+      this.mode = s.noise === 'deepfilter' ? 'rnnoise-fallback' : 'rnnoise';
       const [wasmBinary] = await Promise.all([getWasm(), ctx.audioWorklet.addModule(rnnoiseWorkletUrl)]);
       this.rnnoise = new RnnoiseWorkletNode(ctx, { wasmBinary, maxChannels: 1 });
       node.connect(this.rnnoise);
       node = this.rnnoise;
     }
+    this.preGate = node; // what the noise gate "sees" (after volume + AI)
     if (s.gateEnabled) {
       await ctx.audioWorklet.addModule(noiseGateWorkletUrl);
       const gate = new NoiseGateWorkletNode(ctx, { openThreshold: s.gateDb ?? -50, closeThreshold: (s.gateDb ?? -50) - 5, holdMs: 200, maxChannels: 1 });
       node.connect(gate);
       node = gate;
     }
+    this.out = node; // what everyone else hears
     const dest = ctx.createMediaStreamDestination();
     node.connect(dest);
     this.processedTrack = dest.stream.getAudioTracks()[0];
@@ -113,6 +126,38 @@ export function startSpeakingDetector(mediaStreamTrack, onChange, { thresholdDb 
     if (next !== on) { on = next; onChange(on); }
   }, 20);
   return () => { clearInterval(id); ctx.close().catch(() => {}); if (on) onChange(false); };
+}
+
+// Mic test for the settings screen: same capture constraints and the SAME processing chain as a call.
+// Reports three levels (dB): before the AI, what the gate sees, and what others actually hear.
+export async function startMicTest(settings, { onLevels, monitor = false, outputDevice } = {}) {
+  const s = settings;
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: {
+    deviceId: s.inputDevice ? { exact: s.inputDevice } : undefined,
+    echoCancellation: s.echo, autoGainControl: s.agc, noiseSuppression: s.noise === 'browser', channelCount: 1,
+  } });
+  const track = stream.getAudioTracks()[0];
+  const proc = new BlobMicProcessor({ ...s });
+  await proc.build(track);
+  const ctx = proc.ctx;
+  const mk = (node) => { const a = ctx.createAnalyser(); a.fftSize = 1024; node.connect(a); return a; };
+  const an = { raw: mk(proc.preAi), gate: mk(proc.preGate), out: mk(proc.out) };
+  const buf = new Float32Array(1024);
+  const db = (a) => { a.getFloatTimeDomainData(buf); let sum = 0; for (const v of buf) sum += v * v; return Math.max(-100, 20 * Math.log10(Math.sqrt(sum / buf.length) + 1e-9)); };
+  // "Hear yourself": play exactly what others hear on your output device.
+  const mon = ctx.createGain();
+  mon.gain.value = monitor ? 1 : 0;
+  proc.out.connect(mon).connect(ctx.destination);
+  if (outputDevice && ctx.setSinkId) ctx.setSinkId(outputDevice).catch(() => {});
+  let raf;
+  const tick = () => { onLevels({ raw: db(an.raw), gate: db(an.gate), out: db(an.out), mode: proc.mode }); raf = requestAnimationFrame(tick); };
+  tick();
+  return {
+    mode: proc.mode,
+    setMonitor: (on) => { mon.gain.value = on ? 1 : 0; },
+    setGain: (g) => proc.setGain(g),
+    stop: () => { cancelAnimationFrame(raf); stream.getTracks().forEach((t) => t.stop()); proc.destroy(); },
+  };
 }
 
 // Microphone level meter (for the settings screen).

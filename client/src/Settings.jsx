@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState , useRef } from 'react';
 import { api } from './api';
 import { voice, SHARE_RESOLUTIONS } from './voice';
-import { startMicMeter } from './noise';
+import { startMicTest } from './noise';
 import { Avatar, Icon, Modal, Slider, useVoice } from './ui';
 import { AddSoundModal, EditSoundModal } from './SoundEditor';
 
@@ -129,25 +129,37 @@ function VoiceTab() {
   const v = useVoice();
   const s = v.settings;
   const devices = useDevices();
-  const [level, setLevel] = useState(-100);
+  const [levels, setLevels] = useState({ raw: -100, gate: -100, out: -100, mode: null });
   const [testing, setTesting] = useState(false);
+  const [hearMe, setHearMe] = useState(false);
+  const testRef = useRef(null);
+  // Wait until the gate slider stops moving before rebuilding the test (the AI takes ~1s to start).
+  const [gateDbSettled, setGateDbSettled] = useState(s.gateDb);
+  useEffect(() => { const id = setTimeout(() => setGateDbSettled(s.gateDb), 450); return () => clearTimeout(id); }, [s.gateDb]);
   const inputs = devices.filter((d) => d.kind === 'audioinput');
   const outputs = devices.filter((d) => d.kind === 'audiooutput');
   const cams = devices.filter((d) => d.kind === 'videoinput');
 
+  // The test rebuilds the exact call chain whenever a setting that changes the sound changes.
   useEffect(() => {
     if (!testing) return;
-    let stop;
-    startMicMeter(s.inputDevice, setLevel).then((f) => (stop = f)).catch(() => setTesting(false));
-    return () => stop?.();
-  }, [testing, s.inputDevice]);
+    let alive = true;
+    let handle;
+    startMicTest(s, { onLevels: (l) => alive && setLevels(l), monitor: hearMe, outputDevice: s.outputDevice })
+      .then((h) => { if (alive) { handle = h; testRef.current = h; } else h.stop(); })
+      .catch(() => setTesting(false));
+    return () => { alive = false; handle?.stop(); testRef.current = null; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [testing, s.inputDevice, s.noise, s.echo, s.agc, s.gateEnabled, gateDbSettled, s.outputDevice]);
+  useEffect(() => { testRef.current?.setMonitor(hearMe); }, [hearMe]);
 
   const set = (patch, restart = true) => {
     voice.saveSettings(patch);
     if (restart) voice.restartMic();
   };
-  const meterPct = Math.max(0, Math.min(100, ((level + 100) / 100) * 100));
-  const gatePct = ((s.gateDb + 100) / 100) * 100;
+  const pct = (db) => Math.max(0, Math.min(100, db + 100));
+  const gatePct = pct(s.gateDb);
+  const MODE_LABEL = { deepfilter: '✅ Blob AI Pro (DeepFilterNet3) active', rnnoise: '✅ Blob AI Lite (RNNoise) active', 'rnnoise-fallback': '⚠️ AI Pro failed on this PC, using AI Lite (RNNoise)', browser: 'System suppression', off: 'No suppression' };
 
   return (
     <>
@@ -165,14 +177,24 @@ function VoiceTab() {
             {outputs.map((d) => <option key={d.deviceId} value={d.deviceId}>{d.label || 'Alto-falante'}</option>)}
           </select>
         </label>
-        <Slider label="Input volume" value={s.inputGain * 100} max={300} onChange={(x) => { voice.saveSettings({ inputGain: x / 100 }); voice.micProcessor?.setGain(x / 100); }} />
+        <Slider label="Input volume" value={s.inputGain * 100} max={300} onChange={(x) => { voice.saveSettings({ inputGain: x / 100 }); voice.micProcessor?.setGain(x / 100); testRef.current?.setGain(x / 100); }} />
         <Slider label="Soundboard volume" value={s.soundVolume * 100} max={100} onChange={(x) => voice.saveSettings({ soundVolume: x / 100 })} />
       </div>
 
       <div className="mic-test">
-        <button className="btn" onClick={() => setTesting(!testing)}>{testing ? 'Stop test' : 'Test microphone'}</button>
-        <div className="meter"><div className="meter-fill" style={{ width: meterPct + '%' }} />{s.gateEnabled && <div className="meter-gate" style={{ left: gatePct + '%' }} />}</div>
+        <button className="btn" onClick={() => { setTesting(!testing); if (testing) setHearMe(false); }}>{testing ? 'Stop test' : 'Test microphone'}</button>
+        <button className={'btn' + (hearMe ? ' primary' : '')} disabled={!testing} onClick={() => setHearMe(!hearMe)} title="Plays exactly what others hear. Use headphones to avoid feedback.">
+          {hearMe ? '🎧 Listening to myself' : '🎧 Hear myself'}
+        </button>
       </div>
+      {testing && (
+        <div className="mic-meters">
+          <div className="mic-meter-row"><span>Microphone (before AI)</span><div className="meter"><div className="meter-fill raw" style={{ width: pct(levels.raw) + '%' }} /></div><b>{Math.round(levels.raw)} dB</b></div>
+          <div className="mic-meter-row"><span>After AI {s.gateEnabled && '(gate line)'}</span><div className="meter"><div className="meter-fill" style={{ width: pct(levels.gate) + '%' }} />{s.gateEnabled && <div className="meter-gate" style={{ left: gatePct + '%' }} />}</div><b>{Math.round(levels.gate)} dB</b></div>
+          <div className="mic-meter-row"><span>What others hear</span><div className="meter"><div className={'meter-fill' + (levels.out > -70 ? ' live' : '')} style={{ width: pct(levels.out) + '%' }} /></div><b>{levels.out > -70 ? 'sending' : 'silent'}</b></div>
+          <small className="muted">{MODE_LABEL[levels.mode] || 'Starting…'}{hearMe && ' · use headphones to avoid feedback'}</small>
+        </div>
+      )}
 
       <div className="divider" />
       <h3>Noise suppression</h3>
