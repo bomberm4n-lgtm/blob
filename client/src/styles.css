@@ -545,3 +545,7 @@ kbd { background: var(--bg-0); padding: 4px 10px; border-radius: 6px; font-famil
 .sound-emoji-pick .emoji-input { width: 64px; text-align: center; font-size: 18px; }
 .sound-fields { display: flex; flex-direction: column; gap: 14px; }
 .sound-preview-btn { pointer-events: none; align-self: flex-start; min-width: 140px; }
+
+/* ---------- Pixel intro (canvas) ---------- */
+.intro.intro-pixel { background: transparent; }
+.intro-canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; }
