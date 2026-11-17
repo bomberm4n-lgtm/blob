@@ -66,16 +66,16 @@ export default function Intro({ onDone }) {
   useEffect(() => {
     const cv = ref.current;
     const ctx = cv.getContext('2d');
-    const H = 200; // higher internal resolution = smaller, crisper characters on a full-screen scene
+    const H = 285; // higher internal resolution = smaller, crisper characters on a full-screen scene
     let W = 213;
-    const resize = () => { W = Math.max(160, Math.round((H * window.innerWidth) / window.innerHeight)); cv.width = W; cv.height = H; ctx.imageSmoothingEnabled = false; };
+    const resize = () => { W = Math.max(220, Math.round((H * window.innerWidth) / window.innerHeight)); cv.width = W; cv.height = H; ctx.imageSmoothingEnabled = false; };
     resize();
     window.addEventListener('resize', resize);
 
     const slime = sprite(SLIME, SLIME_COLORS);
     const slimeBlink = sprite(SLIME, SLIME_COLORS, true);
     const r = rng(7);
-    const stars = Array.from({ length: 160 }, () => ({ x: r(), y: r() * 0.62, p: r() * 6.28, s: r() < 0.15 ? 2 : 1 }));
+    const stars = Array.from({ length: 260 }, () => ({ x: r(), y: r() * 0.62, p: r() * 6.28, s: r() < 0.15 ? 2 : 1 }));
     const parts = Array.from({ length: 28 }, (_, i) => { const a = Math.PI + (i / 27) * Math.PI + (r() - 0.5) * 0.3; const sp = 30 + r() * 60; return { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 10, c: ['#8ed8f5', '#e6f8ff', '#5cb6df', '#ffffff'][i % 4], s: r() < 0.3 ? 2 : 1 }; });
     const sparkles = Array.from({ length: 26 }, () => ({ x: r(), y: r(), t0: 2.9 + r() * 2.2, life: 0.4 + r() * 0.5 }));
 
@@ -88,6 +88,52 @@ export default function Intro({ onDone }) {
         if ([[0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [-1, -1], [1, -1], [-1, 1]].some(([a, b]) => on(gy + a, gx + b))) px(x + gx * scale, y + gy * scale, scale, scale, outline);
       }
       g.forEach((row, gy) => [...row].forEach((ch, gx) => { if (ch === '#') px(x + gx * scale, y + gy * scale, scale, scale, typeof fill === 'function' ? fill(gx, gy, rows) : fill); }));
+    };
+
+    const drawMoon = (mx, my, R, t) => {
+      // Aura
+      for (let y = -R - 6; y <= R + 6; y++) for (let x = -R - 6; x <= R + 6; x++) {
+        const d = Math.hypot(x, y);
+        if (d > R && d <= R + 6 && (x + y) % 2 === 0) { ctx.globalAlpha = 0.28 * (1 - (d - R) / 6) * (0.8 + 0.2 * Math.sin(t * 2.2)); px(mx + x, my + y, 1, 1, '#ff8a3c'); }
+      }
+      ctx.globalAlpha = 1;
+      const glow = 0.75 + 0.25 * Math.sin(t * 5);
+      for (let y = -R; y <= R; y++) for (let x = -R; x <= R; x++) {
+        if (x * x + y * y > R * R) continue;
+        const u = x / R, v = y / R;
+        // base + light from top-left, shadow bottom-right
+        let col = u + v > 0.75 ? '#b89452' : u + v < -0.9 ? '#fbeab0' : '#e8cf86';
+        // craters
+        for (const [cu, cv, cr] of [[-0.45, -0.62, 0.13], [0.42, -0.58, 0.1], [0.62, 0.05, 0.09], [-0.7, 0.18, 0.08]]) if ((u - cu) ** 2 + (v - cv) ** 2 < cr * cr) col = '#c4a464';
+        // angry eyes: lids slope down toward the nose
+        for (const sgn of [-1, 1]) {
+          const eu = u * sgn; // mirror so both eyes use the same math
+          const lid = -0.32 + (0.62 - eu) * 0.45;           // lower near the center (eu small)
+          const inEye = ((eu - 0.38) / 0.26) ** 2 + ((v + 0.12) / 0.17) ** 2 <= 1 && v > lid;
+          if (inEye) {
+            col = '#2a0d08';
+            if ((eu - 0.36) ** 2 + (v + 0.08) ** 2 < 0.085 ** 2) col = glow > 0.9 ? '#fff3a0' : '#ffcc33';
+            else if ((eu - 0.36) ** 2 + (v + 0.08) ** 2 < 0.13 ** 2) col = '#e0521c';
+          }
+          if (v <= lid && v > lid - 0.11 && eu > 0.1 && eu < 0.68) col = '#5a3414'; // brow
+        }
+        // nose shadow
+        if (Math.abs(u) < 0.07 && v > 0.04 && v < 0.2) col = '#b89452';
+        // jagged grin with teeth
+        const mw = 0.66;
+        if (Math.abs(u) < mw) {
+          const q = (u / mw) ** 2;
+          const top = 0.34 - 0.2 * q, bot = 0.62 - 0.4 * q;
+          if (v > top && v < bot) {
+            col = '#2a0606';
+            const f = Math.abs(((u * 7) % 1 + 1) % 1 - 0.5) * 2; // 0 at tooth tip, 1 between teeth
+            if (v - top < 0.11 * (1 - f)) col = '#fff6e0';
+            if (bot - v < 0.09 * (1 - f)) col = '#fff6e0';
+            if (v - top > 0.1 && bot - v > 0.1 && Math.abs(u) < 0.3) col = '#5a0f0f'; // tongue-ish
+          }
+        }
+        px(mx + x, my + y, 1, 1, col);
+      }
     };
 
     const start = performance.now();
@@ -105,21 +151,20 @@ export default function Intro({ onDone }) {
       ctx.globalAlpha = 1;
 
       // Sky: dithered bands from deep navy to teal.
-      const bands = ['#070b18', '#0a1124', '#0d1730', '#10203d', '#13294a', '#173458', '#1b4064'];
+      const bands = ['#05060f', '#080a18', '#0c0e21', '#10132b', '#151834', '#1b1c3c', '#221f42'];
       bands.forEach((col, i) => px(-4, (i * groundY) / bands.length - 4, W + 8, groundY / bands.length + 8, col));
       for (let i = 1; i < bands.length; i++) { const y = Math.round((i * groundY) / bands.length); for (let x = (i % 2) - 4; x < W + 4; x += 2) px(x, y - 1, 1, 1, bands[i]); }
 
       // Twinkling stars.
       stars.forEach((s) => { const a = 0.5 + 0.5 * Math.sin(t * 3 + s.p); if (a > 0.25) { ctx.globalAlpha = a; px(s.x * W, s.y * H, s.s, s.s, s.s > 1 ? '#fff6c2' : '#ffffff'); } });
       ctx.globalAlpha = 1;
-      // Pixel moon.
-      const mx = W - 46, my = 26;
-      for (let y = -7; y <= 7; y++) for (let x = -7; x <= 7; x++) if (x * x + y * y <= 49) px(mx + x, my + y, 1, 1, (x + 3) ** 2 + (y - 2) ** 2 <= 9 ? '#d9e3f0' : '#f4f7ff');
+      // Creepy monster moon: glowing angry eyes, furrowed brows, jagged grin, craters, orange aura.
+      drawMoon(W - 70, 52 + Math.round(Math.sin(t * 1.3) * 1.5), 27, t);
 
       // Parallax hills.
       const hill = (off, amp, base, col, speed) => { for (let x = -4; x < W + 4; x++) { const hgt = Math.round(base + amp * Math.sin((x + t * speed + off) / 17) + amp * 0.5 * Math.sin((x + t * speed + off) / 7)); px(x, groundY - hgt, 1, hgt + 1, col); } };
-      hill(0, 9, 34, '#16324c', 4);
-      hill(90, 7, 18, '#1d4766', 9);
+      hill(0, 13, 48, '#14142b', 4);
+      hill(90, 10, 26, '#1d1b38', 9);
 
       // Ground: grass tiles + dirt.
       for (let x = -4; x < W + 4; x += 8) { px(x, groundY, 8, 3, '#3ecf8e'); px(x + 2, groundY + 1, 2, 1, '#7fe8b8'); px(x, groundY + 3, 8, H - groundY, '#2a1c14'); px(x + 4, groundY + 7, 2, 2, '#3b2a1e'); px(x + 1, groundY + 12, 2, 2, '#3b2a1e'); }

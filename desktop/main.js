@@ -33,6 +33,7 @@ let pendingSource = null; // { id, audio }
 function createWindow() {
   win = new BrowserWindow({
     width: 1400, height: 860, minWidth: 940, minHeight: 560,
+    show: false, // shown maximized once ready (below)
     backgroundColor: '#18191c',
     title: 'Blob',
     icon: path.join(__dirname, 'icon.png'),
@@ -44,6 +45,9 @@ function createWindow() {
     },
   });
   Menu.setApplicationMenu(null);
+  // Open maximized so the intro and the app use the whole screen.
+  win.once('ready-to-show', () => { win.maximize(); win.show(); });
+  setTimeout(() => { if (win && !win.isVisible()) { win.maximize(); win.show(); } }, 3000);
 
   const showConnect = (error) => win.loadFile(path.join(__dirname, 'connect.html'), { query: { error: error || '', server: serverUrl } });
   if (serverUrl) {
