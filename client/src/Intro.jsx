@@ -1,10 +1,14 @@
 // 6-second opening animation: the slime drops in and bounces, the name pops in letter by letter, then it all fades out.
 import { useEffect, useState } from 'react';
+import { playIntroMusic } from './introMusic';
+import { voice } from './voice';
 
 export const INTRO_MS = 6000;
 
 export default function Intro({ onDone }) {
   const [leaving, setLeaving] = useState(false);
+  // Chiptune jingle synced to the animation; skipping the intro fades it out.
+  useEffect(() => playIntroMusic(voice.settings.soundVolume ?? 0.6), []);
   useEffect(() => {
     const fade = setTimeout(() => setLeaving(true), INTRO_MS - 900);
     const done = setTimeout(onDone, INTRO_MS);
