@@ -97,15 +97,28 @@ function broadcastRelated(uid, msg) {
   if (!seen.has(uid)) sendTo(uid, msg);
 }
 
+// ---------- Presence status (online / idle / dnd / invisible) ----------
+try { db.exec("ALTER TABLE users ADD COLUMN presence TEXT DEFAULT 'online'"); } catch { /* column already exists */ }
+const PRESENCES = ['online', 'idle', 'dnd', 'invisible'];
+// What OTHER people see: invisible users and disconnected users both look offline.
+function shownPresence(uid) {
+  if (!sockets.has(uid)) return 'offline';
+  const p = db.prepare('SELECT presence FROM users WHERE id=?').get(uid)?.presence || 'online';
+  return p === 'invisible' ? 'offline' : p;
+}
+const presenceMsg = (uid) => { const st = shownPresence(uid); return { t: 'presence', userId: uid, online: st !== 'offline', status: st }; };
+
 function bootstrap(uid) {
-  const user = publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(uid));
+  const row = db.prepare('SELECT * FROM users WHERE id=?').get(uid);
+  const user = { ...publicUser(row), presence: row.presence || 'online' };
   const servers = db.prepare('SELECT s.* FROM servers s JOIN members m ON m.server_id=s.id WHERE m.user_id=? ORDER BY s.id').all(uid).map((s) => ({
     ...s,
     channels: db.prepare('SELECT * FROM channels WHERE server_id=? ORDER BY position, id').all(s.id),
     members: db.prepare('SELECT u.* FROM users u JOIN members m ON m.user_id=u.id WHERE m.server_id=? ORDER BY u.username').all(s.id).map(publicUser),
     sounds: db.prepare('SELECT * FROM sounds WHERE server_id=? ORDER BY id').all(s.id),
   }));
-  return { user, servers, online: [...sockets.keys()], voice: Object.fromEntries(voice) };
+  const presence = Object.fromEntries([...sockets.keys()].map((id) => [id, shownPresence(id)]).filter(([, st]) => st !== 'offline'));
+  return { user, servers, online: Object.keys(presence).map(Number), presence, voice: Object.fromEntries(voice) };
 }
 
 // ---------- HTTP ----------
@@ -191,7 +204,12 @@ app.post('/api/logout', auth, (req, res) => {
 app.get('/api/bootstrap', auth, (req, res) => res.json(bootstrap(req.uid)));
 
 app.patch('/api/me', auth, (req, res) => {
-  const { status, color } = req.body || {};
+  const { status, color, presence } = req.body || {};
+  if (PRESENCES.includes(presence)) {
+    db.prepare('UPDATE users SET presence=? WHERE id=?').run(presence, req.uid);
+    broadcastRelated(req.uid, presenceMsg(req.uid));
+    if (status === undefined && color === undefined) return res.json({ ok: true });
+  }
   if (typeof status === 'string') db.prepare('UPDATE users SET status=? WHERE id=?').run(status.slice(0, 80), req.uid);
   if (typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color)) db.prepare('UPDATE users SET color=? WHERE id=?').run(color, req.uid);
   broadcastRelated(req.uid, { t: 'refresh' });
@@ -463,7 +481,7 @@ wss.on('connection', (ws, req) => {
   const firstConn = !sockets.has(uid);
   if (firstConn) sockets.set(uid, new Set());
   sockets.get(uid).add(ws);
-  if (firstConn) broadcastRelated(uid, { t: 'presence', userId: uid, online: true });
+  if (firstConn) broadcastRelated(uid, presenceMsg(uid));
   ws.send(JSON.stringify({ t: 'hello', version: clientVersion() }));
 
   ws.isAlive = true;
@@ -489,7 +507,7 @@ wss.on('connection', (ws, req) => {
     if (set && set.size === 0) {
       sockets.delete(uid);
       if (voice.has(uid)) setVoice(uid, null);
-      broadcastRelated(uid, { t: 'presence', userId: uid, online: false });
+      broadcastRelated(uid, presenceMsg(uid));
     }
   });
 });

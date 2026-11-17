@@ -452,3 +452,33 @@ kbd { background: var(--bg-0); padding: 4px 10px; border-radius: 6px; font-famil
 @keyframes intro-glow { 0% { opacity: 0; transform: scale(.4); } 45% { opacity: 0; } 70% { opacity: 1; transform: scale(1); } 100% { opacity: .8; transform: scale(1.05); } }
 @keyframes intro-pixel { 0% { opacity: 0; transform: translateY(20px); } 25% { opacity: .9; } 100% { opacity: 0; transform: translateY(-80px); } }
 @media (prefers-reduced-motion: reduce) { .intro *, .intro { animation-duration: .01s !important; animation-delay: 0s !important; } }
+
+/* ---------- Presence status ---------- */
+.status-dot.idle { background: var(--yellow, #f0b232); -webkit-mask: radial-gradient(circle at 28% 28%, transparent 34%, #000 36%); mask: radial-gradient(circle at 28% 28%, transparent 34%, #000 36%); }
+.status-dot.dnd { background: #f23f43; }
+.status-dot.dnd::after { content: ''; position: absolute; left: 22%; right: 22%; top: 50%; height: 22%; transform: translateY(-50%); border-radius: 2px; background: var(--bg-1); }
+.status-dot.invisible, .status-dot.offline { background: #80848e; }
+.status-dot.invisible::after, .status-dot.offline::after { content: ''; position: absolute; inset: 28%; border-radius: 50%; background: var(--bg-1); }
+.status-dot.idle { border: 0; box-shadow: 0 0 0 3px var(--bg-1); }
+.member .status-dot.idle { box-shadow: 0 0 0 3px var(--bg-1); }
+
+.user-panel { position: relative; }
+.user-panel-avatar { border-radius: 50%; cursor: pointer; }
+.user-panel-avatar:hover { filter: brightness(1.15); }
+.status-menu { position: absolute; bottom: calc(100% + 8px); left: 8px; width: 250px; z-index: 950; background: var(--bg-0, #111214); border-radius: 8px; padding: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .5); animation: status-pop .12s ease-out; }
+.status-opt { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border-radius: 4px; cursor: pointer; }
+.status-opt:hover { background: var(--accent); color: var(--accent-text, #0d1f16); }
+.status-opt:hover small { color: inherit; opacity: .85; }
+.status-opt.active b::after { content: '  ✓'; }
+.status-opt b { display: block; font-size: 14px; font-weight: 600; }
+.status-opt small { display: block; font-size: 12px; color: var(--text-muted, #949ba4); margin-top: 2px; }
+.status-icon { position: relative; flex: none; width: 12px; height: 12px; border-radius: 50%; margin-top: 3px; }
+.status-icon.online { background: var(--accent); }
+.status-icon.idle { background: var(--yellow, #f0b232); -webkit-mask: radial-gradient(circle at 28% 28%, transparent 34%, #000 36%); mask: radial-gradient(circle at 28% 28%, transparent 34%, #000 36%); }
+.status-icon.dnd { background: #f23f43; }
+.status-icon.dnd::after { content: ''; position: absolute; left: 22%; right: 22%; top: 50%; height: 22%; transform: translateY(-50%); border-radius: 2px; background: var(--bg-0, #111214); }
+.status-icon.invisible { background: #80848e; }
+.status-icon.invisible::after { content: ''; position: absolute; inset: 28%; border-radius: 50%; background: var(--bg-0, #111214); }
+.status-opt:hover .status-icon.dnd::after, .status-opt:hover .status-icon.invisible::after { background: var(--accent); }
+@keyframes status-pop { from { opacity: 0; transform: translateY(6px) scale(.97); } to { opacity: 1; transform: none; } }

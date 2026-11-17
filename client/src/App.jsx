@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, connectSocket, setToken } from './api';
 import { voice } from './voice';
 import { Avatar, ContextMenu, Icon, Modal, Slider, Tooltip, useVoice } from './ui';
@@ -10,7 +10,9 @@ export default function App() {
   const [data, setData] = useState(null);
   const [serverId, setServerId] = useState(() => Number(localStorage.getItem('blob_server')) || null);
   const [lastChannel, setLastChannel] = useState(() => JSON.parse(localStorage.getItem('blob_lastch') || '{}'));
-  const [online, setOnline] = useState(new Set());
+  const [presence, setPresence] = useState({}); // userId -> online | idle | dnd (missing = offline)
+  const [myPresence, setMyPresence] = useState('online');
+  const [statusMenu, setStatusMenu] = useState(false);
   const [voiceStates, setVoiceStates] = useState({});
   const [updateReady, setUpdateReady] = useState(false);
   const [messages, setMessages] = useState({});
@@ -27,7 +29,8 @@ export default function App() {
   const load = useCallback(async () => {
     const d = await api('/api/bootstrap');
     setData(d);
-    setOnline(new Set(d.online));
+    setPresence(d.presence || Object.fromEntries(d.online.map((id) => [id, 'online'])));
+    setMyPresence(d.user.presence || 'online');
     setVoiceStates(d.voice);
   }, []);
 
@@ -42,7 +45,7 @@ export default function App() {
           if (voice.channelId) setUpdateReady(true); else location.reload();
         }
       } else if (m.t === 'refresh') load();
-      else if (m.t === 'presence') setOnline((o) => { const n = new Set(o); m.online ? n.add(m.userId) : n.delete(m.userId); return n; });
+      else if (m.t === 'presence') setPresence((p) => { const n = { ...p }; const st = m.status || (m.online ? 'online' : 'offline'); if (st === 'offline') delete n[m.userId]; else n[m.userId] = st; return n; });
       else if (m.t === 'voice') setVoiceStates((vs) => { const n = { ...vs }; if (m.state) n[m.userId] = m.state; else delete n[m.userId]; return n; });
       else if (m.t === 'message') {
         setMessages((ms) => (ms[m.msg.channel_id] ? { ...ms, [m.msg.channel_id]: [...ms[m.msg.channel_id], m.msg] } : ms));
@@ -91,7 +94,7 @@ export default function App() {
     for (const s of servers) for (const u of s.members) m[u.id] = u;
     return m;
   }, [servers]);
-  stateRef.current = { channelId, me: me?.id };
+  stateRef.current = { channelId, me: me?.id, myPresence };
 
   useEffect(() => { if (server) localStorage.setItem('blob_server', server.id); }, [server]);
 
@@ -109,6 +112,7 @@ export default function App() {
 
   function notify(msg) {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    if (stateRef.current.myPresence === 'dnd') return;
     try { new Notification(msg.username, { body: msg.content || 'Sent a file', icon: '/blob.svg', silent: false }); } catch { /* ignore */ }
   }
 
@@ -235,11 +239,16 @@ export default function App() {
 
         {/* User panel */}
         <div className="user-panel">
+          {statusMenu && <StatusMenu current={myPresence} onClose={() => setStatusMenu(false)} onPick={(p) => { setMyPresence(p); setStatusMenu(false); api('/api/me', { method: 'PATCH', body: { presence: p } }).catch(() => {}); }} />}
           <div className="user-panel-info" onClick={() => setModal({ type: 'settings', tab: 'profile' })}>
-            <Avatar user={me} size={32} status="online" speaking={v.speaking.has(String(me.id))} />
+            <Tooltip text="Set status">
+              <div className="user-panel-avatar" onClick={(e) => { e.stopPropagation(); setStatusMenu((x) => !x); }}>
+                <Avatar user={me} size={32} status={myPresence} speaking={v.speaking.has(String(me.id))} />
+              </div>
+            </Tooltip>
             <div className="user-panel-names">
               <strong>{me.username}</strong>
-              <span>{v.settings.pttEnabled && v.channelId ? (v.pttActive ? 'Talking (PTT)' : 'Push-to-talk') : me.status || 'Online'}</span>
+              <span>{v.settings.pttEnabled && v.channelId ? (v.pttActive ? 'Talking (PTT)' : 'Push-to-talk') : me.status || PRESENCE_LABEL[myPresence]}</span>
             </div>
           </div>
           <Tooltip text={v.muted ? 'Unmute' : 'Mute'}>
@@ -270,7 +279,7 @@ export default function App() {
             messages={messages[channel.id]} setMessages={(fn) => setMessages((ms) => ({ ...ms, [channel.id]: fn(ms[channel.id]) }))}
             typingNames={typingNames} socket={socketRef.current}
             showMembers={showMembers} toggleMembers={() => setShowMembers((x) => !x)}
-            members={showMembers && <MemberList server={server} online={online} voiceStates={voiceStates} onUser={(e, u) => setCtx({ x: e.clientX, y: e.clientY, type: 'user', user: u })} />} />
+            members={showMembers && <MemberList server={server} presence={{ ...presence, [me.id]: myPresence === 'invisible' ? 'invisible' : myPresence }} voiceStates={voiceStates} onUser={(e, u) => setCtx({ x: e.clientX, y: e.clientY, type: 'user', user: u })} />} />
         ) : (
           <div className="empty-main"><img src="/blob.svg" alt="" /><p>Create a channel to get started.</p></div>
         )}
@@ -307,12 +316,45 @@ function ChannelGroup({ title, onAdd }) {
   );
 }
 
-function MemberList({ server, online, voiceStates, onUser }) {
-  const on = server.members.filter((u) => online.has(u.id));
-  const off = server.members.filter((u) => !online.has(u.id));
+const PRESENCE_LABEL = { online: 'Online', idle: 'Idle', dnd: 'Do Not Disturb', invisible: 'Invisible' };
+const PRESENCE_OPTIONS = [
+  ['online', 'Online', ''],
+  ['idle', 'Idle', 'You look away from keyboard'],
+  ['dnd', 'Do Not Disturb', "You won't get desktop notifications"],
+  ['invisible', 'Invisible', 'You look offline, but can still use Blob'],
+];
+
+function StatusMenu({ current, onPick, onClose }) {
+  useEffect(() => {
+    const close = (e) => { if (!e.target.closest?.('.status-menu, .user-panel-avatar')) onClose(); };
+    const esc = (e) => e.key === 'Escape' && onClose();
+    window.addEventListener('mousedown', close);
+    window.addEventListener('keydown', esc);
+    return () => { window.removeEventListener('mousedown', close); window.removeEventListener('keydown', esc); };
+  }, [onClose]);
+  return (
+    <div className="status-menu">
+      {PRESENCE_OPTIONS.map(([k, label, desc], i) => (
+        <Fragment key={k}>
+          {i === 1 && <div className="ctx-sep" />}
+          <div className={'status-opt' + (current === k ? ' active' : '')} onClick={() => onPick(k)}>
+            <span className={'status-icon ' + k} />
+            <div><b>{label}</b>{desc && <small>{desc}</small>}</div>
+          </div>
+        </Fragment>
+      ))}
+    </div>
+  );
+}
+
+function MemberList({ server, presence, voiceStates, onUser }) {
+  const statusOf = (u) => presence[u.id] || 'offline';
+  const isOnline = (u) => !['offline', 'invisible'].includes(statusOf(u));
+  const on = server.members.filter(isOnline);
+  const off = server.members.filter((u) => !isOnline(u));
   const row = (u, isOn) => (
     <div key={u.id} className={'member' + (isOn ? '' : ' offline')} onClick={(e) => onUser(e, u)} onContextMenu={(e) => { e.preventDefault(); onUser(e, u); }}>
-      <Avatar user={u} size={32} status={isOn ? 'online' : 'offline'} />
+      <Avatar user={u} size={32} status={statusOf(u)} />
       <div className="member-names">
         <span style={{ color: isOn ? u.color : undefined }}>{u.username}{u.id === server.owner_id && ' 👑'}</span>
         {voiceStates[u.id] ? <small>🔊 In a call{voiceStates[u.id].streaming && ' • streaming'}</small> : u.status && <small>{u.status}</small>}
