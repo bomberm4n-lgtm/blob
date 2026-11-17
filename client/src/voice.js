@@ -447,7 +447,12 @@ class VoiceManager {
   playSoundLocal(url, vol = 1, from) {
     if (this.deafened) return;
     if (from && this.settings.userMuted[from]) return;
+    // No overlap: if this same sound is still playing, stop it and start it over from the beginning.
+    for (const old of this.sounds) {
+      if (old.dataset?.src === url || old.blobSrc === url) { old.pause(); old.currentTime = 0; this.sounds.delete(old); }
+    }
     const a = new Audio(url);
+    a.blobSrc = url;
     const level = Math.max(0, this.settings.soundVolume * vol);
     if (level <= 1) {
       a.volume = level;
