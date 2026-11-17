@@ -66,18 +66,18 @@ export default function Intro({ onDone }) {
   useEffect(() => {
     const cv = ref.current;
     const ctx = cv.getContext('2d');
-    const H = 120;
+    const H = 200; // higher internal resolution = smaller, crisper characters on a full-screen scene
     let W = 213;
-    const resize = () => { W = Math.max(100, Math.round((H * window.innerWidth) / window.innerHeight)); cv.width = W; cv.height = H; ctx.imageSmoothingEnabled = false; };
+    const resize = () => { W = Math.max(160, Math.round((H * window.innerWidth) / window.innerHeight)); cv.width = W; cv.height = H; ctx.imageSmoothingEnabled = false; };
     resize();
     window.addEventListener('resize', resize);
 
     const slime = sprite(SLIME, SLIME_COLORS);
     const slimeBlink = sprite(SLIME, SLIME_COLORS, true);
     const r = rng(7);
-    const stars = Array.from({ length: 70 }, () => ({ x: r(), y: r() * 0.62, p: r() * 6.28, s: r() < 0.15 ? 2 : 1 }));
+    const stars = Array.from({ length: 160 }, () => ({ x: r(), y: r() * 0.62, p: r() * 6.28, s: r() < 0.15 ? 2 : 1 }));
     const parts = Array.from({ length: 28 }, (_, i) => { const a = Math.PI + (i / 27) * Math.PI + (r() - 0.5) * 0.3; const sp = 30 + r() * 60; return { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 10, c: ['#8ed8f5', '#e6f8ff', '#5cb6df', '#ffffff'][i % 4], s: r() < 0.3 ? 2 : 1 }; });
-    const sparkles = Array.from({ length: 22 }, () => ({ x: r(), y: r(), t0: 2.9 + r() * 2.2, life: 0.4 + r() * 0.5 }));
+    const sparkles = Array.from({ length: 26 }, () => ({ x: r(), y: r(), t0: 2.9 + r() * 2.2, life: 0.4 + r() * 0.5 }));
 
     const px = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(Math.round(x), Math.round(y), w, h); };
     const glyph = (g, x, y, scale, fill, outline) => {
@@ -94,7 +94,7 @@ export default function Intro({ onDone }) {
     let raf;
     const frame = (now) => {
       const t = (now - start) / 1000;
-      const groundY = Math.round(H * 0.7);
+      const groundY = Math.round(H * 0.73);
       const cx = Math.round(W / 2);
 
       // Screen shake after the impact.
@@ -113,13 +113,13 @@ export default function Intro({ onDone }) {
       stars.forEach((s) => { const a = 0.5 + 0.5 * Math.sin(t * 3 + s.p); if (a > 0.25) { ctx.globalAlpha = a; px(s.x * W, s.y * H, s.s, s.s, s.s > 1 ? '#fff6c2' : '#ffffff'); } });
       ctx.globalAlpha = 1;
       // Pixel moon.
-      const mx = W - 34, my = 14;
+      const mx = W - 46, my = 26;
       for (let y = -7; y <= 7; y++) for (let x = -7; x <= 7; x++) if (x * x + y * y <= 49) px(mx + x, my + y, 1, 1, (x + 3) ** 2 + (y - 2) ** 2 <= 9 ? '#d9e3f0' : '#f4f7ff');
 
       // Parallax hills.
       const hill = (off, amp, base, col, speed) => { for (let x = -4; x < W + 4; x++) { const hgt = Math.round(base + amp * Math.sin((x + t * speed + off) / 17) + amp * 0.5 * Math.sin((x + t * speed + off) / 7)); px(x, groundY - hgt, 1, hgt + 1, col); } };
-      hill(0, 6, 22, '#16324c', 4);
-      hill(90, 5, 12, '#1d4766', 9);
+      hill(0, 9, 34, '#16324c', 4);
+      hill(90, 7, 18, '#1d4766', 9);
 
       // Ground: grass tiles + dirt.
       for (let x = -4; x < W + 4; x += 8) { px(x, groundY, 8, 3, '#3ecf8e'); px(x + 2, groundY + 1, 2, 1, '#7fe8b8'); px(x, groundY + 3, 8, H - groundY, '#2a1c14'); px(x + 4, groundY + 7, 2, 2, '#3b2a1e'); px(x + 1, groundY + 12, 2, 2, '#3b2a1e'); }
@@ -151,9 +151,9 @@ export default function Intro({ onDone }) {
       ctx.globalAlpha = 1;
 
       // Logo letters drop in on each note.
-      const scale = W >= 150 ? 4 : 3, word = ['B', 'L', 'O', 'B'], step = 5 * scale + 2 * scale;
+      const scale = 3, word = ['B', 'L', 'O', 'B'], step = 5 * scale + 2 * scale;
       const totalW = word.length * step - 2 * scale;
-      const lx0 = Math.round(cx - totalW / 2), ly = Math.round(H * 0.08);
+      const lx0 = Math.round(cx - totalW / 2), ly = Math.round(H * 0.33);
       const flash = t > 5 && t < 5.12;
       const shine = t > 2.95 && t < 3.55 ? (t - 2.95) / 0.6 : t > 4.4 && t < 5 ? (t - 4.4) / 0.6 : -1;
       word.forEach((ch, i) => {
