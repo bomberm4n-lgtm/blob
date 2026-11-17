@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<title>Blob</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; height: 100vh; display: flex; align-items: center; justify-content: center; font-family: 'Segoe UI', system-ui, sans-serif; color: #e3e5e8;
+    background: radial-gradient(circle at 20% 20%, #1f3b2f, transparent 50%), radial-gradient(circle at 80% 80%, #2b2547, transparent 50%), #18191c; }
+  .card { width: 440px; background: #313338; border-radius: 12px; padding: 32px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 16px 48px rgba(0,0,0,.5); }
+  h1 { margin: 0; text-align: center; font-size: 24px; }
+  p { margin: 0; color: #80848e; text-align: center; font-size: 14px; line-height: 1.4; }
+  label { font-size: 12px; font-weight: 700; text-transform: uppercase; color: #b4b8bf; display: flex; flex-direction: column; gap: 6px; }
+  input { background: #18191c; border: 1px solid transparent; border-radius: 6px; padding: 12px; color: #e3e5e8; font-size: 16px; outline: none; }
+  input:focus { border-color: #3ecf8e; }
+  button { background: #3ecf8e; color: #0d1f16; font-weight: 700; border: 0; border-radius: 6px; padding: 12px; font-size: 16px; cursor: pointer; }
+  button:hover { filter: brightness(1.1); }
+  .err { color: #f04a4f; font-size: 14px; text-align: center; }
+  img { width: 80px; align-self: center; }
+  code { background: #18191c; padding: 2px 6px; border-radius: 4px; color: #3ecf8e; }
+</style>
+</head>
+<body>
+  <form class="card" id="f">
+    <img src="icon.png" alt="" />
+    <h1>Conectar ao servidor Blob</h1>
+    <p>Digite o endereço do PC servidor. Pela Tailscale é algo como <code>100.101.102.103:3000</code>.</p>
+    <div class="err" id="err"></div>
+    <label>Endereço do servidor<input id="url" placeholder="100.x.x.x:3000" autofocus /></label>
+    <button>Conectar</button>
+  </form>
+<script>
+  const q = new URLSearchParams(location.search);
+  document.getElementById('err').textContent = q.get('error') || '';
+  if (q.get('loading')) {
+    document.querySelector('h1').textContent = 'Conectando ao servidor…';
+    document.querySelector('p').textContent = (q.get('server') || '').replace(/^https?:\/\//, '');
+    document.querySelector('label').style.display = 'none';
+    document.querySelector('button').style.display = 'none';
+  }
+  document.getElementById('url').value = (q.get('server') || '').replace(/^https?:\/\//, '');
+  document.getElementById('f').onsubmit = async (e) => {
+    e.preventDefault();
+    const ok = await window.blobDesktop.setServer(document.getElementById('url').value);
+    if (!ok) document.getElementById('err').textContent = 'Endereço inválido';
+  };
+</script>
+</body>
+</html>

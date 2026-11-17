@@ -1,0 +1,65 @@
+{
+  "name": "blob",
+  "productName": "Blob",
+  "version": "0.2.0",
+  "description": "Blob - voz, chat e transmissão de tela com os amigos",
+  "main": "main.js",
+  "author": "Blob",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis",
+    "dist:linux": "electron-builder --linux AppImage"
+  },
+  "build": {
+    "appId": "app.blob.desktop",
+    "productName": "Blob",
+    "icon": "icon.png",
+    "files": [
+      "main.js",
+      "preload.js",
+      "connect.html",
+      "icon.png"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "artifactName": "Blob-Setup.exe"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Network",
+      "maintainer": "Blob",
+      "synopsis": "Voz, chat e transmissao de tela"
+    },
+    "appImage": {
+      "artifactName": "Blob-linux.AppImage"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "bomberm4n-lgtm",
+        "repo": "blob",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "devDependencies": {
+    "electron": "^45.3.3",
+    "electron-builder": "^26.18.0"
+  },
+  "homepage": "https://github.com/bomberm4n-lgtm/blob",
+  "dependencies": {
+    "electron-updater": "^6.8.11"
+  },
+  "repository": "https://github.com/bomberm4n-lgtm/blob"
+}

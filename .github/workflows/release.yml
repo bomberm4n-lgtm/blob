@@ -1,0 +1,35 @@
+# Gera os instaladores do Blob e publica no GitHub Releases quando uma tag vX.Y.Z é enviada.
+# Os apps instalados baixam a atualização sozinhos a partir daqui.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: --win nsis
+          - os: ubuntu-latest
+            target: --linux AppImage
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Instalar dependências
+        working-directory: desktop
+        run: npm ci
+      - name: Gerar e publicar instalador
+        working-directory: desktop
+        run: npx electron-builder ${{ matrix.target }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

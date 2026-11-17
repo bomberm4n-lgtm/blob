@@ -1,0 +1,48 @@
+=====================================================
+                     BLOB
+   Voz, chat, soundboard e transmissão de tela
+=====================================================
+
+---------- 1. LIGAR O SERVIDOR (no PC servidor) ----------
+1) Uma vez só: clique com o botão direito em
+   "Liberar Firewall (executar como admin).bat" > Executar como administrador.
+2) Dê dois cliques em "Iniciar Servidor Blob.bat".
+   Deixe a janela aberta enquanto vocês usam o Blob.
+
+Código para criar conta (seus amigos precisam dele): está em server\config.json, campo "registerCode".
+O PRIMEIRO a criar conta vira dono do servidor "Blob HQ". Crie a sua antes dos amigos!
+
+---------- 2. CONECTAR OS AMIGOS (Tailscale, grátis) ----------
+Muitas operadoras (CGNAT) não deixam acessar seu PC de fora. A Tailscale resolve:
+1) Você e cada amigo instalam a Tailscale: https://tailscale.com/download
+2) Você entra com a sua conta e convida os amigos pra sua rede
+   (painel da Tailscale > "Share" / "Invite users").
+3) O IP do servidor aparece no ícone da Tailscale (algo como 100.x.x.x).
+
+---------- 3. APP DOS AMIGOS ----------
+Mande pra eles: desktop\dist\Blob-Setup-0.1.1.exe  (ou Blob-Portatil-0.1.1.exe, que não precisa instalar)
+Na primeira vez, o app pede o endereço do servidor: digite  100.x.x.x:3000
+O Windows pode avisar "editor desconhecido": clique em "Mais informações" > "Executar assim mesmo".
+
+No PC servidor, você também pode usar o app (endereço: localhost:3000).
+
+---------- O QUE TEM ----------
+- Canais de texto e voz, vários servidores, convites
+- Chat com imagens, vídeos, arquivos, reações, editar/apagar, markdown, spoiler
+- Transmissão de tela com resolução LIVRE (480p até 4K ou nativa), 5 a 240 FPS,
+  bitrate de 1 a 60 Mbps, codec H.264/VP8/VP9/AV1, com áudio do PC
+- Só baixa a transmissão quem clica em "Assistir" (economiza seu upload)
+- Câmera
+- Soundboard (cada servidor tem os seus sons; até 5MB por som)
+- Supressão de ruído com IA (RNNoise), cancelamento de eco, noise gate
+- Volume individual de cada pessoa e de cada transmissão (até 200%)
+- Silenciar/ensurdecer, aperte-para-falar, Ctrl+Shift+M e Ctrl+Shift+D
+- Escolher microfone, saída de áudio e câmera
+
+---------- LIMITE REAL ----------
+O seu UPLOAD de internet: cada amigo assistindo uma transmissão de 8 Mbps
+usa ~8 Mbps do upload de quem transmite e do servidor.
+
+---------- RODAR O SERVIDOR NO OUTRO PC ----------
+Copie a pasta inteira D:\Blob pro outro PC, instale o Node.js (https://nodejs.org)
+e rode os mesmos .bat lá.
