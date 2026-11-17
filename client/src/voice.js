@@ -1,4 +1,4 @@
-// Gerencia a conexão de voz (LiveKit): microfone, tela, câmera, soundboard e volumes por pessoa.
+// Manages the voice connection (LiveKit): microphone, screen, camera, soundboard and per-user volumes.
 import { Room, RoomEvent, Track, createLocalAudioTrack, createLocalVideoTrack, VideoPresets } from 'livekit-client';
 import { api } from './api';
 import { BlobMicProcessor, startSpeakingDetector, preloadDeepFilter } from './noise';
@@ -12,7 +12,7 @@ const defaults = {
   gateEnabled: false, gateDb: -50,
   inputGain: 1,
   userVolumes: {}, // userId -> 0..2
-  userMuted: {}, // userId -> bool (mutado só pra mim)
+  userMuted: {}, // userId -> bool (muted just for me)
   streamVolumes: {}, // userId -> 0..2
   soundVolume: 0.6,
   pttEnabled: false, pttKey: 'KeyV',
@@ -22,7 +22,7 @@ const defaults = {
 function loadSettings() {
   try {
     const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
-    // Migração: quem estava no RNNoise passa pro DeepFilterNet (melhor).
+    // Migration: users on RNNoise move to DeepFilterNet (better).
     if (s.noiseV !== 2) { if (!s.noise || s.noise === 'rnnoise') s.noise = 'deepfilter'; s.noiseV = 2; }
     return { ...defaults, ...s, share: { ...defaults.share, ...(s.share || {}) } };
   } catch {
@@ -36,7 +36,7 @@ export const SHARE_RESOLUTIONS = {
   '1080': { w: 1920, h: 1080, label: '1080p' },
   '1440': { w: 2560, h: 1440, label: '1440p (2K)' },
   '2160': { w: 3840, h: 2160, label: '2160p (4K)' },
-  source: { w: 0, h: 0, label: 'Original (nativa)' },
+  source: { w: 0, h: 0, label: 'Source (native)' },
 };
 
 class VoiceManager {
@@ -47,11 +47,11 @@ class VoiceManager {
   muted = false;
   deafened = false;
   speaking = new Set();
-  lkSpeaking = new Set(); // detecção do servidor (fallback)
-  spk = new Map(); // identity -> expira em (ms) — detecção instantânea enviada por cada um
-  spkCapable = new Set(); // quem envia detecção instantânea
+  lkSpeaking = new Set(); // server-side detection (fallback)
+  spk = new Map(); // identity -> expires at (ms) — instant detection sent by each client
+  spkCapable = new Set(); // clients that send instant detection
   localSpeaking = false;
-  watching = new Set(); // userIds cujas telas estou assistindo
+  watching = new Set(); // userIds whose screens I'm watching
   settings = loadSettings();
   ping = null;
   error = null;
@@ -98,7 +98,7 @@ class VoiceManager {
     this.error = null;
     this.emit();
     try {
-      if (this.settings.noise === 'deepfilter') preloadDeepFilter(); // baixa a IA enquanto conecta
+      if (this.settings.noise === 'deepfilter') preloadDeepFilter(); // download the AI model while connecting
       const { token, url } = await api('/api/voice/token?channelId=' + channelId);
       const room = new Room({
         adaptiveStream: false,
@@ -110,15 +110,15 @@ class VoiceManager {
       this.bindRoom(room);
       await room.connect(url, token, { autoSubscribe: false });
       if (this.room !== room) return room.disconnect();
-      // Assina automaticamente só o áudio (voz); telas só quando clicar em "Assistir".
+      // Auto-subscribe to audio (voice) only; screens only after clicking "Watch".
       for (const p of room.remoteParticipants.values()) for (const pub of p.trackPublications.values()) this.autoSub(pub);
       if (this.settings.outputDevice) await room.switchActiveDevice('audiooutput', this.settings.outputDevice).catch(() => {});
       try {
         await this.publishMic();
       } catch (micErr) {
-        console.warn('Sem microfone', micErr);
+        console.warn('No microphone', micErr);
         this.muted = true;
-        this.error = 'Microfone indisponível (' + micErr.message + '). Você entrou só ouvindo.';
+        this.error = 'Microphone unavailable (' + micErr.message + '). You joined listen-only.';
       }
       this.status = 'connected';
       this.playUiSound('join');
@@ -127,9 +127,9 @@ class VoiceManager {
       this.startPing();
     } catch (e) {
       console.error(e);
-      this.error = 'Falha ao conectar na voz: ' + (e.message || e);
+      this.error = 'Failed to connect to voice: ' + (e.message || e);
       await this.leave(true);
-      this.error = 'Falha ao conectar na voz: ' + (e.message || e);
+      this.error = 'Failed to connect to voice: ' + (e.message || e);
       this.emit();
     }
   }
@@ -192,7 +192,7 @@ class VoiceManager {
       .on(RoomEvent.Disconnected, () => {
         if (this.room === room) this.leave(true);
       })
-      .on(RoomEvent.MediaDevicesError, (err) => { this.error = 'Erro de dispositivo: ' + err.message; e(); });
+      .on(RoomEvent.MediaDevicesError, (err) => { this.error = 'Device error: ' + err.message; e(); });
   }
 
   startPing() {
@@ -230,7 +230,7 @@ class VoiceManager {
         this.micProcessor = new BlobMicProcessor(s);
         await track.setProcessor(this.micProcessor);
       } catch (err) {
-        console.warn('Processador de áudio falhou, usando microfone puro', err);
+        console.warn('Audio processor failed, using raw microphone', err);
       }
     }
     await this.local.publishTrack(track, { source: Track.Source.Microphone, dtx: true, red: true, audioPreset: { maxBitrate: 96000 } });
@@ -238,7 +238,7 @@ class VoiceManager {
     this.startLocalDetector(track);
   }
 
-  // ---------- Indicador de fala (círculo verde) ----------
+  // ---------- Speaking indicator (green ring) ----------
   startLocalDetector(track) {
     this.stopDetector?.();
     const mst = track.getProcessor?.()?.processedTrack || track.mediaStreamTrack;
@@ -250,11 +250,11 @@ class VoiceManager {
         this.sendSpk();
         this.updateSpeaking();
       });
-    } catch (err) { console.warn('detector de fala falhou', err); }
+    } catch (err) { console.warn('speaking detector failed', err); }
     clearInterval(this.spkTimer);
     this.spkTimer = setInterval(() => {
       if (this.localSpeaking && (this.muted || this.deafened || track.isMuted)) { this.localSpeaking = false; this.sendSpk(); }
-      else if (this.localSpeaking) this.sendSpk(); // renova (quem entrou depois também vê)
+      else if (this.localSpeaking) this.sendSpk(); // refresh (so late joiners see it too)
       const now = Date.now();
       for (const [id, exp] of this.spk) if (exp < now) this.spk.delete(id);
       this.updateSpeaking();
@@ -270,7 +270,7 @@ class VoiceManager {
     const me = this.local?.identity;
     if (me && this.localSpeaking) next.add(me);
     for (const id of this.spk.keys()) next.add(id);
-    // Quem ainda não manda a detecção instantânea: usa a do servidor.
+    // Clients that don't send instant detection yet: use the server's.
     for (const id of this.lkSpeaking) if (id !== me && !this.spkCapable.has(id)) next.add(id);
     const same = next.size === this.speaking.size && [...next].every((x) => this.speaking.has(x));
     if (!same) { this.speaking = next; this.emit(); }
@@ -290,7 +290,7 @@ class VoiceManager {
     if (!m && this.deafened) this.setDeafened(false, true);
     const t = this.micTrack();
     if (!m && !t && this.room && this.status === 'connected') {
-      try { await this.publishMic(); this.error = null; } catch (e) { this.muted = true; this.error = 'Microfone indisponível: ' + e.message; this.emit(); return; }
+      try { await this.publishMic(); this.error = null; } catch (e) { this.muted = true; this.error = 'Microphone unavailable: ' + e.message; this.emit(); return; }
     }
     if (t && !this.settings.pttEnabled) m ? await t.mute() : await t.unmute();
     this.playUiSound(m ? 'mute' : 'unmute');
@@ -352,7 +352,7 @@ class VoiceManager {
     await this.room?.switchActiveDevice('audiooutput', id).catch(() => {});
   }
 
-  // ---------- Assistir telas ----------
+  // ---------- Watching screens ----------
   watch(uid, on) {
     const p = this.room?.remoteParticipants.get(uid);
     if (on) this.watching.add(uid); else this.watching.delete(uid);
@@ -365,7 +365,7 @@ class VoiceManager {
     this.emit();
   }
 
-  // ---------- Compartilhar tela ----------
+  // ---------- Screen share ----------
   async startScreenShare(opts) {
     if (!this.room) return;
     const o = { ...this.settings.share, ...opts };
@@ -391,9 +391,9 @@ class VoiceManager {
       videoCodec: o.codec,
       videoEncoding: { maxBitrate, maxFramerate: o.fps, priority: 'high' },
       screenShareEncoding: { maxBitrate, maxFramerate: o.fps, priority: 'high' },
-      // Nunca deixa o encoder reduzir a resolução por conta própria (era isso que deixava a imagem borrada).
+      // Never let the encoder drop resolution on its own (that's what made the image blurry).
       degradationPreference: o.hint === 'detail' ? 'maintain-resolution' : 'balanced',
-      // VP9/AV1: uma camada só, na resolução cheia (sem camadas menores que o servidor poderia escolher).
+      // VP9/AV1: a single full-resolution layer (no smaller layers the server could pick instead).
       scalabilityMode: o.codec === 'vp9' || o.codec === 'av1' ? 'L1T3' : undefined,
       backupCodec: false,
     });
@@ -420,7 +420,7 @@ class VoiceManager {
     this.emit();
   }
 
-  // ---------- Câmera ----------
+  // ---------- Camera ----------
   async toggleCamera() {
     if (!this.room) return;
     const pub = this.local.getTrackPublication(Track.Source.Camera);
@@ -462,7 +462,7 @@ class VoiceManager {
     this.sounds.clear();
   }
 
-  // Sons curtos da interface (entrar/sair/mutar), sintetizados.
+  // Short synthesized UI sounds (join/leave/mute).
   playUiSound(kind) {
     try {
       const ctx = (this.uiCtx ||= new AudioContext());

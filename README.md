@@ -1,39 +1,42 @@
 # Blob
 
-Voz, chat, soundboard e transmissão de tela em alta qualidade, para usar com os amigos num servidor próprio.
+<img src="desktop/icon.png" width="96" align="right" alt="Blob" />
 
-- Canais de texto e voz, vários servidores, convites
-- Transmissão de tela com resolução, FPS, bitrate e codec livres, com o áudio do PC (sem as vozes da call)
-- Supressão de ruído com IA (DeepFilterNet3 ou RNNoise), cancelamento de eco, noise gate
-- Soundboard, volume por pessoa e por transmissão (até 200%), aperte-para-falar
-- Atualiza sozinho: o app desktop pelo GitHub Releases, o servidor pelo `git pull`
+Voice, chat, soundboard and high-quality screen sharing on a server you run yourself, for you and your friends.
 
-## Instalar o app
+- Text and voice channels, multiple servers, invites
+- Screen sharing with any resolution, FPS, bitrate and codec, plus PC audio (without the call's voices)
+- AI noise suppression (DeepFilterNet3 or RNNoise), echo cancellation, noise gate
+- Instant speaking indicator, soundboard, per-user and per-stream volume (up to 200%), push to talk
+- Self-updating: the desktop app through GitHub Releases, the server through `git pull`
 
-- **Windows:** baixe [Blob-Setup.exe](https://github.com/bomberm4n-lgtm/blob/releases/latest/download/Blob-Setup.exe) e instale.
-- **Linux (Ubuntu e derivados):**
+## Install the app
+
+- **Windows:** download [Blob-Setup.exe](https://github.com/bomberm4n-lgtm/blob/releases/latest/download/Blob-Setup.exe) and run it.
+- **Linux (Ubuntu and derivatives):**
   ```bash
   curl -fsSL https://raw.githubusercontent.com/bomberm4n-lgtm/blob/main/install-linux.sh | bash
   ```
 
-Na primeira vez, o app pede o endereço do servidor (ex.: `100.x.x.x:3000` pela Tailscale).
+On first launch the app asks for the server address (for example `100.x.x.x:3000` over Tailscale).
 
-## Rodar o servidor (Windows)
+## Run the server (Windows)
 
-1. Instale [Node.js](https://nodejs.org) e [Git](https://git-scm.com).
-2. `git clone https://github.com/bomberm4n-lgtm/blob.git` e abra a pasta.
-3. Clique com o botão direito em `Liberar Firewall (executar como admin).bat` e escolha **Executar como administrador** (uma vez só).
-4. Abra `Iniciar Servidor Blob.bat`. Ele instala tudo, baixa o LiveKit e, a cada 5 minutos, confere se há atualização no GitHub.
+1. Install [Node.js](https://nodejs.org) and [Git](https://git-scm.com).
+2. `git clone https://github.com/bomberm4n-lgtm/blob.git` and open the folder.
+3. Right-click `Open Firewall (run as admin).bat` and choose **Run as administrator** (once).
+4. Run `Start Blob Server.bat`. It installs everything, downloads LiveKit and checks GitHub for updates every 5 minutes.
 
-As chaves e o código de convite são gerados em `server/config.json`, que nunca vai pro GitHub.
+Friends connect over [Tailscale](https://tailscale.com): share the server machine with them from the Tailscale admin console.
+Keys and the invite code are generated in `server/config.json`, which never goes to GitHub.
 
-## Lançar uma versão nova do app desktop
+## Release a new desktop version
 
-1. Aumente `version` em `desktop/package.json`.
+1. Bump `version` in `desktop/package.json`.
 2. `git tag vX.Y.Z && git push --tags`
 
-O GitHub Actions gera os instaladores, e os apps instalados se atualizam sozinhos.
+GitHub Actions builds the installers and the installed apps update themselves.
 
-## Licenças de terceiros
+## Third-party licenses
 
 LiveKit (Apache-2.0), Electron (MIT), DeepFilterNet3 (MIT/Apache-2.0), RNNoise (BSD-3), React (MIT).

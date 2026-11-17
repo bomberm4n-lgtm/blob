@@ -22,7 +22,7 @@ function VideoEl({ track, mirror, contain, onStats }) {
       ref.prev = { frames, now };
       const fps = prev ? Math.round(((frames - prev.frames) * 1000) / (now - prev.now)) : null;
       const s = { w: el.videoWidth, h: el.videoHeight, fps, mbps: track?.currentBitrate ? (track.currentBitrate / 1e6).toFixed(1) : null };
-      // Quem transmite: mostra o que REALMENTE está sendo enviado e o motivo de limitação.
+      // For the streamer: show what is ACTUALLY being sent and what is limiting it.
       if (track?.getSenderStats) {
         track.getSenderStats().then((arr) => {
           const st = Array.isArray(arr) ? arr[0] : arr;
@@ -54,8 +54,8 @@ function StreamTile({ p, user, isLocal, watching, focused, onFocus }) {
         <div className="stream-preview-bg" style={{ background: user?.color }} />
         <div className="tile-center">
           <Avatar user={user} size={56} />
-          <span className="live-badge big">AO VIVO</span>
-          <button className="btn primary" onClick={(e) => { e.stopPropagation(); voice.watch(id, true); }}><Icon name="eye" size={18} /> Assistir transmissão</button>
+          <span className="live-badge big">LIVE</span>
+          <button className="btn primary" onClick={(e) => { e.stopPropagation(); voice.watch(id, true); }}><Icon name="eye" size={18} /> Watch stream</button>
         </div>
         <div className="tile-name"><Icon name="screen" size={14} /> {user?.username}</div>
       </div>
@@ -64,10 +64,10 @@ function StreamTile({ p, user, isLocal, watching, focused, onFocus }) {
 
   return (
     <div ref={ref} className={'tile stream-tile' + (focused ? ' focused' : '')} onDoubleClick={fullscreen} onClick={onFocus}>
-      {track ? <VideoEl track={track} contain onStats={setStats} /> : <div className="tile-center muted">Carregando transmissão…</div>}
-      <div className="tile-name"><span className="live-badge">AO VIVO</span> {user?.username}{isLocal && ' (você)'}</div>
+      {track ? <VideoEl track={track} contain onStats={setStats} /> : <div className="tile-center muted">Loading stream…</div>}
+      <div className="tile-name"><span className="live-badge">LIVE</span> {user?.username}{isLocal && ' (you)'}</div>
       {stats && stats.w > 0 && (
-        <div className="stream-stats">{stats.w}×{stats.h}{stats.fps != null && ` • ${stats.fps} fps`}{stats.mbps != null && ` • ${stats.mbps} Mbps`}{isLocal && v.shareInfo && ` (máx ${v.shareInfo.bitrate}) • ${v.shareInfo.codec.toUpperCase()}`}{stats.limit && ` • limitado por ${stats.limit === 'cpu' ? 'CPU' : stats.limit === 'bandwidth' ? 'rede' : stats.limit}`}</div>
+        <div className="stream-stats">{stats.w}×{stats.h}{stats.fps != null && ` • ${stats.fps} fps`}{stats.mbps != null && ` • ${stats.mbps} Mbps`}{isLocal && v.shareInfo && ` (max ${v.shareInfo.bitrate}) • ${v.shareInfo.codec.toUpperCase()}`}{stats.limit && ` • limited by ${stats.limit === 'cpu' ? 'CPU' : stats.limit === 'bandwidth' ? 'network' : stats.limit}`}</div>
       )}
       <div className="tile-controls" onClick={(e) => e.stopPropagation()}>
         {!isLocal && (
@@ -76,9 +76,9 @@ function StreamTile({ p, user, isLocal, watching, focused, onFocus }) {
             <Slider value={(v.settings.streamVolumes[id] ?? 1) * 100} max={200} onChange={(x) => voice.setStreamVolume(id, x / 100)} />
           </div>
         )}
-        {!isLocal && <Tooltip text="Parar de assistir"><button className="icon-btn" onClick={() => voice.watch(id, false)}><Icon name="close" /></button></Tooltip>}
-        {isLocal && <Tooltip text="Parar transmissão"><button className="icon-btn red" onClick={() => voice.stopScreenShare()}><Icon name="stop" /></button></Tooltip>}
-        <Tooltip text="Tela cheia"><button className="icon-btn" onClick={fullscreen}><Icon name="full" /></button></Tooltip>
+        {!isLocal && <Tooltip text="Stop watching"><button className="icon-btn" onClick={() => voice.watch(id, false)}><Icon name="close" /></button></Tooltip>}
+        {isLocal && <Tooltip text="Stop streaming"><button className="icon-btn red" onClick={() => voice.stopScreenShare()}><Icon name="stop" /></button></Tooltip>}
+        <Tooltip text="Fullscreen"><button className="icon-btn" onClick={fullscreen}><Icon name="full" /></button></Tooltip>
       </div>
     </div>
   );
@@ -116,8 +116,8 @@ export default function VoiceView({ channel, server, usersById, voiceStates, onJ
             {others.length ? others.map(([uid]) => <Avatar key={uid} user={usersById[uid]} size={64} />) : <img src="/blob.svg" alt="" className="lobby-blob" />}
           </div>
           <h2>{channel.name}</h2>
-          <p className="muted">{others.length ? `${others.map(([u]) => usersById[u]?.username).join(', ')} ${others.length > 1 ? 'estão' : 'está'} na call` : 'Ninguém está aqui ainda.'}</p>
-          <button className="btn primary big" onClick={onJoin}>Entrar na chamada</button>
+          <p className="muted">{others.length ? `${others.map(([u]) => usersById[u]?.username).join(', ')} ${others.length > 1 ? 'are' : 'is'} in the call` : 'Nobody is here yet.'}</p>
+          <button className="btn primary big" onClick={onJoin}>Join call</button>
         </div>
       </div>
     );
@@ -156,22 +156,22 @@ export default function VoiceView({ channel, server, usersById, voiceStates, onJ
         )}
       </div>
       <div className="call-bar">
-        <Tooltip text={v.local?.isCameraEnabled ? 'Desligar câmera' : 'Ligar câmera'}>
+        <Tooltip text={v.local?.isCameraEnabled ? 'Turn off camera' : 'Turn on camera'}>
           <button className={'call-btn' + (v.local?.isCameraEnabled ? ' on' : '')} onClick={() => voice.toggleCamera().catch((e) => alert(e.message))}><Icon name="cam" size={24} /></button>
         </Tooltip>
-        <Tooltip text={v.shareInfo ? 'Parar transmissão' : 'Compartilhar tela'}>
+        <Tooltip text={v.shareInfo ? 'Stop streaming' : 'Share screen'}>
           <button className={'call-btn' + (v.shareInfo ? ' on' : '')} onClick={() => (v.shareInfo ? voice.stopScreenShare() : onShare())}><Icon name={v.shareInfo ? 'screenOff' : 'screen'} size={24} /></button>
         </Tooltip>
-        <Tooltip text={v.muted ? 'Ativar microfone' : 'Silenciar'}>
+        <Tooltip text={v.muted ? 'Unmute' : 'Mute'}>
           <button className={'call-btn' + (v.muted || v.deafened ? ' off' : '')} onClick={() => voice.setMuted(!v.muted)}><Icon name={v.muted || v.deafened ? 'micOff' : 'mic'} size={24} /></button>
         </Tooltip>
-        <Tooltip text={v.deafened ? 'Ativar áudio' : 'Desativar áudio'}>
+        <Tooltip text={v.deafened ? 'Undeafen' : 'Deafen'}>
           <button className={'call-btn' + (v.deafened ? ' off' : '')} onClick={() => voice.setDeafened(!v.deafened)}><Icon name={v.deafened ? 'headOff' : 'head'} size={24} /></button>
         </Tooltip>
         <Tooltip text="Soundboard">
           <button className="call-btn" onClick={onSoundboard}><Icon name="sb" size={24} /></button>
         </Tooltip>
-        <Tooltip text="Desconectar">
+        <Tooltip text="Disconnect">
           <button className="call-btn hang" onClick={() => voice.leave()}><Icon name="hangup" size={24} /></button>
         </Tooltip>
       </div>

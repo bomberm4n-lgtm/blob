@@ -1,4 +1,4 @@
-// Processador de microfone: ganho de entrada + supressão de ruído (RNNoise) + noise gate (sensibilidade).
+// Microphone processor: input gain + noise suppression (DeepFilterNet3 / RNNoise) + noise gate (sensitivity).
 import { RnnoiseWorkletNode, NoiseGateWorkletNode, loadRnnoise } from '@sapphi-red/web-noise-suppressor';
 import rnnoiseWorkletUrl from '@sapphi-red/web-noise-suppressor/rnnoiseWorklet.js?url';
 import noiseGateWorkletUrl from '@sapphi-red/web-noise-suppressor/noiseGateWorklet.js?url';
@@ -8,11 +8,11 @@ import rnnoiseSimdUrl from '@sapphi-red/web-noise-suppressor/rnnoise_simd.wasm?u
 let wasmPromise;
 const getWasm = () => (wasmPromise ||= loadRnnoise({ url: rnnoiseWasmUrl, simdUrl: rnnoiseSimdUrl }));
 
-// DeepFilterNet3 (IA de supressão de ruído nível "Krisp", open-source). Arquivos servidos pelo próprio servidor do Blob.
+// DeepFilterNet3 (open-source, Krisp-level AI noise suppression). Files are served by the Blob server itself.
 let dfModulePromise;
 const getDfModule = () => (dfModulePromise ||= (async () => {
   const res = await fetch('/dfn/df_bg.wasm');
-  if (!res.ok) throw new Error('DeepFilterNet não encontrado (' + res.status + ')');
+  if (!res.ok) throw new Error('DeepFilterNet not found (' + res.status + ')');
   return WebAssembly.compileStreaming ? WebAssembly.compileStreaming(res).catch(async () => WebAssembly.compile(await (await fetch('/dfn/df_bg.wasm')).arrayBuffer())) : WebAssembly.compile(await res.arrayBuffer());
 })().catch((e) => { dfModulePromise = null; throw e; }));
 export const preloadDeepFilter = () => getDfModule().catch(() => {});
@@ -55,7 +55,7 @@ export class BlobMicProcessor {
         node.connect(this.dfn);
         node = this.dfn;
       } catch (err) {
-        console.warn('DeepFilterNet falhou, usando RNNoise', err);
+        console.warn('DeepFilterNet failed, falling back to RNNoise', err);
         useRnnoise = true;
       }
     }
@@ -91,8 +91,8 @@ export class BlobMicProcessor {
   }
 }
 
-// Detector de fala instantâneo: mede o áudio que REALMENTE sai pros outros (depois da supressão/gate).
-// Acende assim que tem som e apaga ~150 ms depois que o som para.
+// Instant speaking detector: measures the audio that ACTUALLY goes out to others (after suppression/gate).
+// Lights up as soon as there is sound and turns off ~150 ms after it stops.
 export function startSpeakingDetector(mediaStreamTrack, onChange, { thresholdDb = -52, releaseMs = 150 } = {}) {
   const ctx = new AudioContext();
   const an = ctx.createAnalyser();
@@ -115,7 +115,7 @@ export function startSpeakingDetector(mediaStreamTrack, onChange, { thresholdDb 
   return () => { clearInterval(id); ctx.close().catch(() => {}); if (on) onChange(false); };
 }
 
-// Medidor de volume do microfone (para a tela de configurações).
+// Microphone level meter (for the settings screen).
 export async function startMicMeter(deviceId, onLevel) {
   const stream = await navigator.mediaDevices.getUserMedia({ audio: deviceId ? { deviceId: { exact: deviceId } } : true });
   const ctx = new AudioContext();

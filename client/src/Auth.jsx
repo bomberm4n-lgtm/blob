@@ -29,19 +29,19 @@ export default function Auth({ onDone }) {
       <div className="auth-blobs"><span /><span /><span /></div>
       <form className="auth-card" onSubmit={submit}>
         <img src="/blob.svg" alt="" className="auth-logo" />
-        <h1>{mode === 'login' ? 'Que bom te ver de novo!' : 'Criar uma conta'}</h1>
-        <p className="muted">{mode === 'login' ? 'Entre no Blob pra falar com a galera.' : 'Peça o código de convite pro dono do servidor.'}</p>
-        <label>Nome de usuário<input value={username} onChange={(e) => setUsername(e.target.value)} autoFocus required /></label>
-        <label>Senha<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
+        <h1>{mode === 'login' ? 'Welcome back!' : 'Create an account'}</h1>
+        <p className="muted">{mode === 'login' ? 'Log in to Blob to hang out with the crew.' : 'Ask the server owner for the invite code.'}</p>
+        <label>Username<input value={username} onChange={(e) => setUsername(e.target.value)} autoFocus required /></label>
+        <label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
         {mode === 'register' && (
-          <label>Código de convite do Blob<input value={code} onChange={(e) => setCode(e.target.value)} placeholder="ex: a1b2c3" /></label>
+          <label>Blob invite code<input value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. a1b2c3" /></label>
         )}
         {error && <div className="form-error">{error}</div>}
-        <button className="btn primary big" disabled={busy}>{mode === 'login' ? 'Entrar' : 'Criar conta'}</button>
+        <button className="btn primary big" disabled={busy}>{mode === 'login' ? 'Log in' : 'Create account'}</button>
         <p className="muted small">
-          {mode === 'login' ? 'Precisa de uma conta? ' : 'Já tem conta? '}
+          {mode === 'login' ? 'Need an account? ' : 'Already have an account? '}
           <a href="#" onClick={(e) => { e.preventDefault(); setMode(mode === 'login' ? 'register' : 'login'); setError(''); }}>
-            {mode === 'login' ? 'Registre-se' : 'Entrar'}
+            {mode === 'login' ? 'Register' : 'Log in'}
           </a>
         </p>
       </form>

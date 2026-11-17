@@ -1,4 +1,4 @@
-// Chamadas HTTP e WebSocket para o servidor Blob.
+// HTTP and WebSocket calls to the Blob server.
 export const getToken = () => localStorage.getItem('blob_token');
 export const setToken = (t) => (t ? localStorage.setItem('blob_token', t) : localStorage.removeItem('blob_token'));
 

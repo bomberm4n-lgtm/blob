@@ -2,7 +2,7 @@
   "name": "blob",
   "productName": "Blob",
   "version": "0.2.0",
-  "description": "Blob - voz, chat e transmissão de tela com os amigos",
+  "description": "Blob - voice, chat and screen sharing with friends",
   "main": "main.js",
   "author": "Blob",
   "scripts": {
@@ -18,7 +18,8 @@
       "main.js",
       "preload.js",
       "connect.html",
-      "icon.png"
+      "icon.png",
+      "icon.ico"
     ],
     "directories": {
       "output": "dist"
@@ -26,12 +27,15 @@
     "win": {
       "target": [
         "nsis"
-      ]
+      ],
+      "icon": "icon.ico"
     },
     "nsis": {
       "oneClick": true,
       "perMachine": false,
-      "artifactName": "Blob-Setup.exe"
+      "artifactName": "Blob-Setup.exe",
+      "installerIcon": "icon.ico",
+      "uninstallerIcon": "icon.ico"
     },
     "linux": {
       "target": [
@@ -39,7 +43,7 @@
       ],
       "category": "Network",
       "maintainer": "Blob",
-      "synopsis": "Voz, chat e transmissao de tela"
+      "synopsis": "Voice, chat and screen sharing"
     },
     "appImage": {
       "artifactName": "Blob-linux.AppImage"

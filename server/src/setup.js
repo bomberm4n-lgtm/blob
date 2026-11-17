@@ -1,4 +1,4 @@
-// Gera config.json (chaves do LiveKit) e livekit.yaml na primeira execução.
+// Generates config.json (LiveKit keys) and livekit.yaml on first run.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -14,12 +14,12 @@ cfg.port ??= 3000;
 cfg.livekitPort ??= 7880;
 cfg.livekitApiKey ??= 'blob' + crypto.randomBytes(4).toString('hex');
 cfg.livekitApiSecret ??= crypto.randomBytes(32).toString('hex');
-// Código exigido para criar conta. Deixe "" para qualquer um poder se registrar.
+// Code required to create an account. Set to "" to let anyone register.
 cfg.registerCode ??= crypto.randomBytes(3).toString('hex');
 
 fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
 
-const yaml = `# Gerado automaticamente por src/setup.js
+const yaml = `# Generated automatically by src/setup.js
 port: ${cfg.livekitPort}
 rtc:
   tcp_port: 7881
@@ -32,4 +32,4 @@ logging:
   level: warn
 `;
 fs.writeFileSync(path.join(root, 'livekit', 'livekit.yaml'), yaml);
-console.log('[blob] config ok. Codigo de registro:', cfg.registerCode || '(aberto)');
+console.log('[blob] config ok. Register code:', cfg.registerCode || '(open)');

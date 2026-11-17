@@ -36,7 +36,7 @@ export default function App() {
     const sock = connectSocket((m) => {
       const s = stateRef.current;
       if (m.t === 'hello') {
-        // Versão nova do Blob no servidor: recarrega (ou avisa, se estiver numa call).
+        // New Blob version on the server: reload (or show a banner if in a call).
         if (!window.__blobVersion) window.__blobVersion = m.version;
         else if (window.__blobVersion !== m.version) {
           if (voice.channelId) setUpdateReady(true); else location.reload();
@@ -64,7 +64,7 @@ export default function App() {
     return () => sock.close();
   }, [load]);
 
-  // Push-to-talk e atalhos
+  // Push-to-talk and shortcuts
   useEffect(() => {
     const down = (e) => {
       if (e.code === voice.settings.pttKey && !e.repeat && !/INPUT|TEXTAREA/.test(e.target.tagName)) voice.pttDown();
@@ -109,10 +109,10 @@ export default function App() {
 
   function notify(msg) {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
-    try { new Notification(msg.username, { body: msg.content || 'Enviou um arquivo', icon: '/blob.svg', silent: false }); } catch { /* ignore */ }
+    try { new Notification(msg.username, { body: msg.content || 'Sent a file', icon: '/blob.svg', silent: false }); } catch { /* ignore */ }
   }
 
-  if (!data) return <div className="loading"><img src="/blob.svg" alt="" className="loading-blob" /><p>Carregando o Blob…</p></div>;
+  if (!data) return <div className="loading"><img src="/blob.svg" alt="" className="loading-blob" /><p>Loading Blob…</p></div>;
 
   const voiceChannel = v.channelId ? servers.flatMap((s) => s.channels).find((c) => c.id === v.channelId) : null;
   const voiceServer = v.channelId ? servers.find((s) => s.channels.some((c) => c.id === v.channelId)) : null;
@@ -123,9 +123,9 @@ export default function App() {
 
   return (
     <div className="app">
-      {!connected && <div className="conn-banner">Reconectando ao servidor Blob…</div>}
-      {updateReady && <div className="conn-banner update-banner">Nova versão do Blob disponível! <button className="btn small" onClick={() => location.reload()}>Atualizar agora</button></div>}
-      {/* Barra de servidores */}
+      {!connected && <div className="conn-banner">Reconnecting to the Blob server…</div>}
+      {updateReady && <div className="conn-banner update-banner">A new version of Blob is available! <button className="btn small" onClick={() => location.reload()}>Update now</button></div>}
+      {/* Server bar */}
       <nav className="rail">
         <Tooltip text="Blob" side="right">
           <div className="rail-item home"><img src="/blob.svg" alt="" /></div>
@@ -140,12 +140,12 @@ export default function App() {
             </div>
           </Tooltip>
         ))}
-        <Tooltip text="Criar ou entrar em um servidor" side="right">
+        <Tooltip text="Create or join a server" side="right">
           <div className="rail-item add" onClick={() => setModal({ type: 'addServer' })}><Icon name="plus" size={24} /></div>
         </Tooltip>
       </nav>
 
-      {/* Canais */}
+      {/* Channels */}
       <aside className="sidebar">
         <header className="sidebar-head" onClick={(e) => setCtx({ x: e.currentTarget.getBoundingClientRect().left + 10, y: 52, type: 'server', server })}>
           <span>{server?.name}</span>
@@ -154,7 +154,7 @@ export default function App() {
         <div className="channel-list">
           {server && (
             <>
-              <ChannelGroup title="Canais de texto" onAdd={() => setModal({ type: 'addChannel', kind: 'text' })} />
+              <ChannelGroup title="Text channels" onAdd={() => setModal({ type: 'addChannel', kind: 'text' })} />
               {channels.filter((c) => c.type === 'text').map((c) => (
                 <div key={c.id} className={'channel' + (c.id === channelId ? ' active' : '') + (unread.has(c.id) ? ' unread' : '')}
                   onClick={() => selectChannel(c)}
@@ -163,7 +163,7 @@ export default function App() {
                   <span>{c.name}</span>
                 </div>
               ))}
-              <ChannelGroup title="Canais de voz" onAdd={() => setModal({ type: 'addChannel', kind: 'voice' })} />
+              <ChannelGroup title="Voice channels" onAdd={() => setModal({ type: 'addChannel', kind: 'voice' })} />
               {channels.filter((c) => c.type === 'voice').map((c) => {
                 const inCh = Object.entries(voiceStates).filter(([, st]) => st.channelId === c.id);
                 return (
@@ -183,7 +183,7 @@ export default function App() {
                           <Avatar user={u} size={24} speaking={speaking} />
                           <span className={speaking ? 'speaking-name' : ''}>{u?.username}</span>
                           <span className="voice-user-icons">
-                            {st.streaming && <span className="live-badge">AO VIVO</span>}
+                            {st.streaming && <span className="live-badge">LIVE</span>}
                             {st.video && <Icon name="cam" size={14} />}
                             {st.deafened ? <Icon name="headOff" size={14} className="red" /> : st.muted && <Icon name="micOff" size={14} className="red" />}
                           </span>
@@ -197,29 +197,29 @@ export default function App() {
           )}
         </div>
 
-        {/* Painel de voz conectado */}
+        {/* Connected voice panel */}
         {v.channelId && (
           <div className="voice-panel">
             <div className="voice-panel-top">
               <div className="voice-status">
                 <div className={'voice-conn ' + v.status}>
                   <Icon name="sound" size={16} />
-                  {v.status === 'connected' ? 'Voz conectada' : v.status === 'reconnecting' ? 'Reconectando…' : 'Conectando…'}
+                  {v.status === 'connected' ? 'Voice connected' : v.status === 'reconnecting' ? 'Reconnecting…' : 'Connecting…'}
                   {v.ping != null && <span className="ping">{v.ping} ms</span>}
                 </div>
                 <div className="voice-where" onClick={() => { setServerId(voiceServer.id); selectChannel(voiceChannel); }}>
                   {voiceChannel?.name} / {voiceServer?.name}
                 </div>
               </div>
-              <Tooltip text="Desconectar">
+              <Tooltip text="Disconnect">
                 <button className="icon-btn hang" onClick={() => voice.leave()}><Icon name="hangup" /></button>
               </Tooltip>
             </div>
             <div className="voice-panel-actions">
-              <Tooltip text={v.local?.isCameraEnabled ? 'Desligar câmera' : 'Ligar câmera'}>
+              <Tooltip text={v.local?.isCameraEnabled ? 'Turn off camera' : 'Turn on camera'}>
                 <button className={'vp-btn' + (v.local?.isCameraEnabled ? ' on' : '')} onClick={() => voice.toggleCamera().catch((e) => alert(e.message))}><Icon name="cam" /></button>
               </Tooltip>
-              <Tooltip text={v.shareInfo ? 'Parar transmissão' : 'Compartilhar tela'}>
+              <Tooltip text={v.shareInfo ? 'Stop streaming' : 'Share screen'}>
                 <button className={'vp-btn' + (v.shareInfo ? ' on' : '')} onClick={() => (v.shareInfo ? voice.stopScreenShare() : setModal({ type: 'share' }))}>
                   <Icon name={v.shareInfo ? 'screenOff' : 'screen'} />
                 </button>
@@ -233,32 +233,32 @@ export default function App() {
         )}
         {!v.channelId && v.error && <div className="voice-error standalone">{v.error}</div>}
 
-        {/* Painel do usuário */}
+        {/* User panel */}
         <div className="user-panel">
           <div className="user-panel-info" onClick={() => setModal({ type: 'settings', tab: 'profile' })}>
             <Avatar user={me} size={32} status="online" speaking={v.speaking.has(String(me.id))} />
             <div className="user-panel-names">
               <strong>{me.username}</strong>
-              <span>{v.settings.pttEnabled && v.channelId ? (v.pttActive ? 'Falando (PTT)' : 'Push-to-talk') : me.status || 'Online'}</span>
+              <span>{v.settings.pttEnabled && v.channelId ? (v.pttActive ? 'Talking (PTT)' : 'Push-to-talk') : me.status || 'Online'}</span>
             </div>
           </div>
-          <Tooltip text={v.muted ? 'Ativar microfone' : 'Silenciar'}>
+          <Tooltip text={v.muted ? 'Unmute' : 'Mute'}>
             <button className={'icon-btn' + (v.muted || v.deafened ? ' red' : '')} onClick={() => voice.setMuted(!v.muted)}>
               <Icon name={v.muted || v.deafened ? 'micOff' : 'mic'} />
             </button>
           </Tooltip>
-          <Tooltip text={v.deafened ? 'Ativar áudio' : 'Desativar áudio'}>
+          <Tooltip text={v.deafened ? 'Undeafen' : 'Deafen'}>
             <button className={'icon-btn' + (v.deafened ? ' red' : '')} onClick={() => voice.setDeafened(!v.deafened)}>
               <Icon name={v.deafened ? 'headOff' : 'head'} />
             </button>
           </Tooltip>
-          <Tooltip text="Configurações">
+          <Tooltip text="Settings">
             <button className="icon-btn" onClick={() => setModal({ type: 'settings' })}><Icon name="gear" /></button>
           </Tooltip>
         </div>
       </aside>
 
-      {/* Conteúdo */}
+      {/* Content */}
       <main className="main">
         {channel?.type === 'voice' ? (
           <VoiceView channel={channel} server={server} usersById={usersById} voiceStates={voiceStates}
@@ -272,7 +272,7 @@ export default function App() {
             showMembers={showMembers} toggleMembers={() => setShowMembers((x) => !x)}
             members={showMembers && <MemberList server={server} online={online} voiceStates={voiceStates} onUser={(e, u) => setCtx({ x: e.clientX, y: e.clientY, type: 'user', user: u })} />} />
         ) : (
-          <div className="empty-main"><img src="/blob.svg" alt="" /><p>Crie um canal pra começar.</p></div>
+          <div className="empty-main"><img src="/blob.svg" alt="" /><p>Create a channel to get started.</p></div>
         )}
       </main>
 
@@ -302,7 +302,7 @@ function ChannelGroup({ title, onAdd }) {
   return (
     <div className="channel-group">
       <span><Icon name="chevron" size={12} /> {title}</span>
-      <Tooltip text="Criar canal"><button className="icon-btn tiny" onClick={onAdd}><Icon name="plus" size={18} /></button></Tooltip>
+      <Tooltip text="Create channel"><button className="icon-btn tiny" onClick={onAdd}><Icon name="plus" size={18} /></button></Tooltip>
     </div>
   );
 }
@@ -315,7 +315,7 @@ function MemberList({ server, online, voiceStates, onUser }) {
       <Avatar user={u} size={32} status={isOn ? 'online' : 'offline'} />
       <div className="member-names">
         <span style={{ color: isOn ? u.color : undefined }}>{u.username}{u.id === server.owner_id && ' 👑'}</span>
-        {voiceStates[u.id] ? <small>🔊 Em call{voiceStates[u.id].streaming && ' • transmitindo'}</small> : u.status && <small>{u.status}</small>}
+        {voiceStates[u.id] ? <small>🔊 In a call{voiceStates[u.id].streaming && ' • streaming'}</small> : u.status && <small>{u.status}</small>}
       </div>
     </div>
   );
@@ -336,10 +336,10 @@ function CtxContent({ ctx, me, close, setModal }) {
     const owner = s.owner_id === me.id;
     return (
       <>
-        <div className="ctx-item" onClick={() => { setModal({ type: 'invite', server: s }); close(); }}>Convidar pessoas</div>
-        {owner && <div className="ctx-item" onClick={() => { setModal({ type: 'rename', what: 'server', item: s }); close(); }}>Renomear servidor</div>}
+        <div className="ctx-item" onClick={() => { setModal({ type: 'invite', server: s }); close(); }}>Invite people</div>
+        {owner && <div className="ctx-item" onClick={() => { setModal({ type: 'rename', what: 'server', item: s }); close(); }}>Rename server</div>}
         {owner && (
-          <label className="ctx-item">Mudar ícone
+          <label className="ctx-item">Change icon
             <input type="file" accept="image/*" hidden onChange={async (e) => {
               const f = new FormData(); f.append('file', e.target.files[0]);
               await api(`/api/servers/${s.id}/icon`, { method: 'POST', form: f }).catch((x) => alert(x.message)); close();
@@ -348,8 +348,8 @@ function CtxContent({ ctx, me, close, setModal }) {
         )}
         <div className="ctx-sep" />
         {owner
-          ? <div className="ctx-item danger" onClick={async () => { if (confirm(`Apagar o servidor "${s.name}"? Isso não pode ser desfeito.`)) await api('/api/servers/' + s.id, { method: 'DELETE' }); close(); }}>Apagar servidor</div>
-          : <div className="ctx-item danger" onClick={async () => { if (confirm(`Sair de "${s.name}"?`)) await api(`/api/servers/${s.id}/leave`, { method: 'POST' }); close(); }}>Sair do servidor</div>}
+          ? <div className="ctx-item danger" onClick={async () => { if (confirm(`Delete the server "${s.name}"? This cannot be undone.`)) await api('/api/servers/' + s.id, { method: 'DELETE' }); close(); }}>Delete server</div>
+          : <div className="ctx-item danger" onClick={async () => { if (confirm(`Leave "${s.name}"?`)) await api(`/api/servers/${s.id}/leave`, { method: 'POST' }); close(); }}>Leave server</div>}
       </>
     );
   }
@@ -357,8 +357,8 @@ function CtxContent({ ctx, me, close, setModal }) {
     const c = ctx.channel;
     return (
       <>
-        <div className="ctx-item" onClick={() => { setModal({ type: 'rename', what: 'channel', item: c }); close(); }}>Editar canal</div>
-        <div className="ctx-item danger" onClick={async () => { if (confirm(`Apagar o canal "${c.name}"?`)) await api('/api/channels/' + c.id, { method: 'DELETE' }); close(); }}>Apagar canal</div>
+        <div className="ctx-item" onClick={() => { setModal({ type: 'rename', what: 'channel', item: c }); close(); }}>Edit channel</div>
+        <div className="ctx-item danger" onClick={async () => { if (confirm(`Delete the channel "${c.name}"?`)) await api('/api/channels/' + c.id, { method: 'DELETE' }); close(); }}>Delete channel</div>
       </>
     );
   }
@@ -379,13 +379,13 @@ function CtxContent({ ctx, me, close, setModal }) {
           <>
             <div className="ctx-sep" />
             <div className="ctx-slider">
-              <Slider label="Volume do usuário" value={(v.settings.userVolumes[id] ?? 1) * 100} max={200} onChange={(x) => voice.setUserVolume(id, x / 100)} />
+              <Slider label="User volume" value={(v.settings.userVolumes[id] ?? 1) * 100} max={200} onChange={(x) => voice.setUserVolume(id, x / 100)} />
             </div>
             <div className="ctx-slider">
-              <Slider label="Volume da transmissão" value={(v.settings.streamVolumes[id] ?? 1) * 100} max={200} onChange={(x) => voice.setStreamVolume(id, x / 100)} />
+              <Slider label="Stream volume" value={(v.settings.streamVolumes[id] ?? 1) * 100} max={200} onChange={(x) => voice.setStreamVolume(id, x / 100)} />
             </div>
             <label className="ctx-item check">
-              Silenciar (só pra mim)
+              Mute (just for me)
               <input type="checkbox" checked={!!v.settings.userMuted[id]} onChange={(e) => voice.setUserMuted(id, e.target.checked)} />
             </label>
           </>
@@ -403,13 +403,13 @@ function AddServerModal({ onClose, onDone }) {
   const create = async () => { try { const r = await api('/api/servers', { method: 'POST', body: { name } }); onDone(r.id); } catch (e) { setErr(e.message); } };
   const join = async () => { try { const r = await api('/api/join', { method: 'POST', body: { invite } }); onDone(r.id); } catch (e) { setErr(e.message); } };
   return (
-    <Modal title="Adicionar servidor" onClose={onClose}>
+    <Modal title="Add a server" onClose={onClose}>
       <div className="modal-body">
-        <label>Criar novo servidor<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome do servidor" /></label>
-        <button className="btn primary" disabled={!name.trim()} onClick={create}>Criar</button>
+        <label>Create a new server<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Server name" /></label>
+        <button className="btn primary" disabled={!name.trim()} onClick={create}>Create</button>
         <div className="or">ou</div>
-        <label>Entrar com um código de convite<input value={invite} onChange={(e) => setInvite(e.target.value)} placeholder="ex: 9f8e7d6c" /></label>
-        <button className="btn" disabled={!invite.trim()} onClick={join}>Entrar no servidor</button>
+        <label>Join with an invite code<input value={invite} onChange={(e) => setInvite(e.target.value)} placeholder="e.g. 9f8e7d6c" /></label>
+        <button className="btn" disabled={!invite.trim()} onClick={join}>Join server</button>
         {err && <div className="form-error">{err}</div>}
       </div>
     </Modal>
@@ -421,14 +421,14 @@ function AddChannelModal({ server, kind, onClose }) {
   const [name, setName] = useState('');
   const create = async () => { await api(`/api/servers/${server.id}/channels`, { method: 'POST', body: { name, type } }).catch((e) => alert(e.message)); onClose(); };
   return (
-    <Modal title="Criar canal" onClose={onClose}>
+    <Modal title="Create channel" onClose={onClose}>
       <div className="modal-body">
         <div className="radio-cards">
-          <label className={type === 'text' ? 'sel' : ''}><input type="radio" checked={type === 'text'} onChange={() => setType('text')} /><Icon name="hash" /> Texto</label>
-          <label className={type === 'voice' ? 'sel' : ''}><input type="radio" checked={type === 'voice'} onChange={() => setType('voice')} /><Icon name="speaker" /> Voz</label>
+          <label className={type === 'text' ? 'sel' : ''}><input type="radio" checked={type === 'text'} onChange={() => setType('text')} /><Icon name="hash" /> Text</label>
+          <label className={type === 'voice' ? 'sel' : ''}><input type="radio" checked={type === 'voice'} onChange={() => setType('voice')} /><Icon name="speaker" /> Voice</label>
         </div>
-        <label>Nome do canal<input value={name} autoFocus onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && name.trim() && create()} placeholder={type === 'text' ? 'novo-canal' : 'Sala 3'} /></label>
-        <button className="btn primary" disabled={!name.trim()} onClick={create}>Criar canal</button>
+        <label>Channel name<input value={name} autoFocus onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && name.trim() && create()} placeholder={type === 'text' ? 'new-channel' : 'Room 3'} /></label>
+        <button className="btn primary" disabled={!name.trim()} onClick={create}>Create channel</button>
       </div>
     </Modal>
   );
@@ -437,12 +437,12 @@ function AddChannelModal({ server, kind, onClose }) {
 function InviteModal({ server, onClose }) {
   const [copied, setCopied] = useState(false);
   return (
-    <Modal title={`Convidar amigos para ${server.name}`} onClose={onClose}>
+    <Modal title={`Invite friends to ${server.name}`} onClose={onClose}>
       <div className="modal-body">
-        <p className="muted">Mande esse código pro seu amigo. Ele clica em <b>+</b> na barra da esquerda e cola o código.</p>
+        <p className="muted">Send this code to your friend. They click <b>+</b> on the left bar and paste the code.</p>
         <div className="invite-box">
           <code>{server.invite}</code>
-          <button className="btn primary" onClick={() => { navigator.clipboard.writeText(server.invite); setCopied(true); }}>{copied ? 'Copiado!' : 'Copiar'}</button>
+          <button className="btn primary" onClick={() => { navigator.clipboard.writeText(server.invite); setCopied(true); }}>{copied ? 'Copied!' : 'Copy'}</button>
         </div>
       </div>
     </Modal>
@@ -456,10 +456,10 @@ function RenameModal({ what, item, onClose }) {
     onClose();
   };
   return (
-    <Modal title={what === 'server' ? 'Renomear servidor' : 'Editar canal'} onClose={onClose}>
+    <Modal title={what === 'server' ? 'Rename server' : 'Edit channel'} onClose={onClose}>
       <div className="modal-body">
-        <label>Nome<input value={name} autoFocus onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} /></label>
-        <button className="btn primary" onClick={save}>Salvar</button>
+        <label>Name<input value={name} autoFocus onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} /></label>
+        <button className="btn primary" onClick={save}>Save</button>
       </div>
     </Modal>
   );

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <title>Blob</title>
@@ -23,17 +23,17 @@
 <body>
   <form class="card" id="f">
     <img src="icon.png" alt="" />
-    <h1>Conectar ao servidor Blob</h1>
-    <p>Digite o endereço do PC servidor. Pela Tailscale é algo como <code>100.101.102.103:3000</code>.</p>
+    <h1>Connect to a Blob server</h1>
+    <p>Enter the address of the server PC. Over Tailscale it looks like <code>100.101.102.103:3000</code>.</p>
     <div class="err" id="err"></div>
-    <label>Endereço do servidor<input id="url" placeholder="100.x.x.x:3000" autofocus /></label>
-    <button>Conectar</button>
+    <label>Server address<input id="url" placeholder="100.x.x.x:3000" autofocus /></label>
+    <button>Connect</button>
   </form>
 <script>
   const q = new URLSearchParams(location.search);
   document.getElementById('err').textContent = q.get('error') || '';
   if (q.get('loading')) {
-    document.querySelector('h1').textContent = 'Conectando ao servidor…';
+    document.querySelector('h1').textContent = 'Connecting to the server…';
     document.querySelector('p').textContent = (q.get('server') || '').replace(/^https?:\/\//, '');
     document.querySelector('label').style.display = 'none';
     document.querySelector('button').style.display = 'none';
@@ -42,7 +42,7 @@
   document.getElementById('f').onsubmit = async (e) => {
     e.preventDefault();
     const ok = await window.blobDesktop.setServer(document.getElementById('url').value);
-    if (!ok) document.getElementById('err').textContent = 'Endereço inválido';
+    if (!ok) document.getElementById('err').textContent = 'Invalid address';
   };
 </script>
 </body>

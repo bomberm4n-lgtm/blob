@@ -6,7 +6,7 @@ const QUICK = ['👍', '😂', '❤️', '🔥', '😮', '😢', '💀', '🤡',
 const EMOJIS = '😀😃😄😁😆😅🤣😂🙂🙃😉😊😇🥰😍🤩😘😋😛😜🤪😝🤑🤗🤭🤫🤔🤐🤨😐😑😶😏😒🙄😬🤥😌😔😪🤤😴😷🤒🤕🤢🤮🤧🥵🥶🥴😵🤯🤠🥳😎🤓🧐😕😟🙁😮😯😲😳🥺😦😧😨😰😥😢😭😱😖😣😞😓😩😫🥱😤😡😠🤬😈👿💀☠️💩🤡👹👺👻👽👾🤖😺😸😹😻😼😽🙀😿😾🙈🙉🙊💋💯💢💥💫💦💨🕳️💣💬👋🤚🖐️✋🖖👌🤌🤏✌️🤞🤟🤘🤙👈👉👆🖕👇☝️👍👎✊👊🤛🤜👏🙌👐🤲🤝🙏💪🧠👀👁️👅👄❤️🧡💛💚💙💜🖤🤍🤎💔🔥⭐🌟✨⚡🎉🎊🏆🎮🕹️🎲🍕🍔🍟🌭🍺🍻☕🚀💎'.match(/\p{Extended_Pictographic}️?/gu);
 
 function renderText(text) {
-  // Markdown simples: **negrito**, *itálico*, `código`, ```bloco```, links e ||spoiler||
+  // Simple markdown: **bold**, *italic*, `code`, ```block```, links and ||spoiler||
   const parts = [];
   const re = /```([\s\S]+?)```|`([^`]+)`|\*\*(.+?)\*\*|\*(.+?)\*|\|\|(.+?)\|\||(https?:\/\/[^\s<]+)/g;
   let last = 0;
@@ -132,7 +132,7 @@ export default function Chat({ channel, server, me, messages, setMessages, typin
         <span className="head-sep" />
         <span className="muted small">{server.name}</span>
         <div className="head-actions">
-          <Tooltip text={showMembers ? 'Ocultar membros' : 'Mostrar membros'} side="bottom">
+          <Tooltip text={showMembers ? 'Hide members' : 'Show members'} side="bottom">
             <button className={'icon-btn' + (showMembers ? ' on' : '')} onClick={toggleMembers}><Icon name="people" /></button>
           </Tooltip>
         </div>
@@ -146,8 +146,8 @@ export default function Chat({ channel, server, me, messages, setMessages, typin
             {!hasMore && (
               <div className="chat-start">
                 <div className="chat-start-icon"><Icon name="hash" size={40} /></div>
-                <h1>Bem-vindo(a) a #{channel.name}!</h1>
-                <p className="muted">Este é o começo do canal #{channel.name}.</p>
+                <h1>Welcome to #{channel.name}!</h1>
+                <p className="muted">This is the start of the #{channel.name} channel.</p>
               </div>
             )}
             {list.map((m, i) => {
@@ -158,10 +158,10 @@ export default function Chat({ channel, server, me, messages, setMessages, typin
               const mention = m.content.includes('@' + me.username) || m.content.includes('@everyone');
               return (
                 <Fragment key={m.id}>
-                  {newDay && <div className="day-sep"><span>{new Date(m.created_at).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div>}
+                  {newDay && <div className="day-sep"><span>{new Date(m.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div>}
                   <div className={'msg' + (grouped && !newDay ? ' grouped' : '') + (mention ? ' mention' : '')}>
                     {grouped && !newDay ? (
-                      <span className="msg-time-side">{new Date(m.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span className="msg-time-side">{new Date(m.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
                     ) : (
                       <Avatar user={{ username: m.username, color: m.color, avatar: m.avatar }} size={40} />
                     )}
@@ -176,10 +176,10 @@ export default function Chat({ channel, server, me, messages, setMessages, typin
                         <div className="msg-edit">
                           <textarea autoFocus value={editing.text} onChange={(e) => setEditing({ ...editing, text: e.target.value })}
                             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(); } if (e.key === 'Escape') setEditing(null); }} />
-                          <small className="muted">Esc para cancelar • Enter para salvar</small>
+                          <small className="muted">Esc to cancel • Enter to save</small>
                         </div>
                       ) : (
-                        m.content && <div className="msg-text">{renderText(m.content)}{m.edited_at && <span className="edited"> (editado)</span>}</div>
+                        m.content && <div className="msg-text">{renderText(m.content)}{m.edited_at && <span className="edited"> (edited)</span>}</div>
                       )}
                       <Attachment a={att} />
                       {Object.keys(m.reactions || {}).length > 0 && (
@@ -194,10 +194,10 @@ export default function Chat({ channel, server, me, messages, setMessages, typin
                     </div>
                     <div className="msg-actions">
                       {QUICK.slice(0, 3).map((e) => <button key={e} onClick={() => react(m.id, e)}>{e}</button>)}
-                      <Tooltip text="Reagir"><button onClick={() => setPicker({ msgId: m.id })}><Icon name="smile" size={18} /></button></Tooltip>
-                      {m.user_id === me.id && <Tooltip text="Editar"><button onClick={() => setEditing({ id: m.id, text: m.content })}><Icon name="edit" size={18} /></button></Tooltip>}
+                      <Tooltip text="React"><button onClick={() => setPicker({ msgId: m.id })}><Icon name="smile" size={18} /></button></Tooltip>
+                      {m.user_id === me.id && <Tooltip text="Edit"><button onClick={() => setEditing({ id: m.id, text: m.content })}><Icon name="edit" size={18} /></button></Tooltip>}
                       {(m.user_id === me.id || server.owner_id === me.id) && (
-                        <Tooltip text="Apagar"><button className="danger" onClick={(e) => (e.shiftKey || confirm('Apagar essa mensagem?')) && api('/api/messages/' + m.id, { method: 'DELETE' })}><Icon name="trash" size={18} /></button></Tooltip>
+                        <Tooltip text="Delete"><button className="danger" onClick={(e) => (e.shiftKey || confirm('Delete this message?')) && api('/api/messages/' + m.id, { method: 'DELETE' })}><Icon name="trash" size={18} /></button></Tooltip>
                       )}
                     </div>
                     {picker?.msgId === m.id && <EmojiPicker onPick={(e) => { react(m.id, e); setPicker(null); }} onClose={() => setPicker(null)} />}
@@ -206,7 +206,7 @@ export default function Chat({ channel, server, me, messages, setMessages, typin
               );
             })}
           </div>
-          {dragging && <div className="drop-overlay"><div>Solte o arquivo para enviar em #{channel.name}</div></div>}
+          {dragging && <div className="drop-overlay"><div>Drop the file to send it in #{channel.name}</div></div>}
           <div className="composer-wrap">
             {file && (
               <div className="file-preview">
@@ -220,14 +220,14 @@ export default function Chat({ channel, server, me, messages, setMessages, typin
                 <Icon name="plus" />
                 <input type="file" hidden onChange={(e) => { setFile(e.target.files[0]); e.target.value = ''; }} />
               </label>
-              <textarea ref={inputRef} rows={1} value={text} placeholder={`Conversar em #${channel.name}`}
+              <textarea ref={inputRef} rows={1} value={text} placeholder={`Message #${channel.name}`}
                 onChange={(e) => setText(e.target.value)} onKeyDown={onKey} onPaste={onPaste} />
               <button className="icon-btn" onClick={() => setPicker(picker === 'input' ? null : 'input')}><Icon name="smile" /></button>
               {picker === 'input' && <EmojiPicker anchor="input" onPick={(e) => { setText((t) => t + e); inputRef.current?.focus(); }} onClose={() => setPicker(null)} />}
             </div>
             <div className="typing">
               {typingNames.length > 0 && (
-                <><span className="dots"><i /><i /><i /></span><b>{typingNames.join(', ')}</b> {typingNames.length > 1 ? 'estão' : 'está'} digitando…</>
+                <><span className="dots"><i /><i /><i /></span><b>{typingNames.join(', ')}</b> {typingNames.length > 1 ? 'are' : 'is'} typing…</>
               )}
             </div>
           </div>

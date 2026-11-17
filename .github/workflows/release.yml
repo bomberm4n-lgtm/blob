@@ -1,5 +1,5 @@
-# Gera os instaladores do Blob e publica no GitHub Releases quando uma tag vX.Y.Z é enviada.
-# Os apps instalados baixam a atualização sozinhos a partir daqui.
+# Builds the Blob installers and publishes them to GitHub Releases when a vX.Y.Z tag is pushed.
+# Installed apps download their updates from here automatically.
 name: Release
 
 on:
@@ -25,10 +25,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Instalar dependências
+      - name: Install dependencies
         working-directory: desktop
         run: npm ci
-      - name: Gerar e publicar instalador
+      - name: Build and publish installer
         working-directory: desktop
         run: npx electron-builder ${{ matrix.target }} --publish always
         env:

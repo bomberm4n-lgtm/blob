@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
-# Instalador do Blob para Linux (Ubuntu e derivados).
-# Uso:  curl -fsSL https://raw.githubusercontent.com/bomberm4n-lgtm/blob/main/install-linux.sh | bash
-# O Blob se atualiza sozinho depois de instalado.
+# Blob installer for Linux (Ubuntu and derivatives).
+# Usage:  curl -fsSL https://raw.githubusercontent.com/bomberm4n-lgtm/blob/main/install-linux.sh | bash
+# Blob updates itself after it is installed.
 set -e
 REPO="bomberm4n-lgtm/blob"
 DIR="$HOME/.local/share/blob"
 BIN="$HOME/.local/bin"
 APPS="$HOME/.local/share/applications"
 
-echo "== Instalando o Blob =="
-rm -rf "$DIR"            # remove versões antigas (instalador .sh antigo)
+echo "== Installing Blob =="
+rm -rf "$DIR"            # remove older installs (old .sh installer)
 mkdir -p "$DIR" "$BIN" "$APPS"
 curl -fL --progress-bar -o "$DIR/Blob.AppImage" "https://github.com/$REPO/releases/latest/download/Blob-linux.AppImage"
 chmod +x "$DIR/Blob.AppImage"
 curl -fsSL -o "$DIR/icon.png" "https://raw.githubusercontent.com/$REPO/main/desktop/icon.png"
 
-# APPIMAGE_EXTRACT_AND_RUN: não precisa de libfuse2. --no-sandbox: evita bloqueio do AppArmor no Ubuntu 24+.
+# APPIMAGE_EXTRACT_AND_RUN: no libfuse2 needed. --no-sandbox: avoids the AppArmor block on Ubuntu 24+.
 cat > "$BIN/blob" <<LAUNCH
 #!/usr/bin/env bash
 export APPIMAGE_EXTRACT_AND_RUN=1
@@ -26,7 +26,7 @@ chmod +x "$BIN/blob"
 cat > "$APPS/blob.desktop" <<DESK
 [Desktop Entry]
 Name=Blob
-Comment=Voz, chat e transmissão de tela
+Comment=Voice, chat and screen sharing
 Exec=$BIN/blob %U
 Icon=$DIR/icon.png
 Terminal=false
@@ -39,4 +39,4 @@ if [ -d "$DESKTOP_DIR" ]; then
   chmod +x "$DESKTOP_DIR/blob.desktop"
   gio set "$DESKTOP_DIR/blob.desktop" metadata::trusted true 2>/dev/null || true
 fi
-echo "Pronto! Abra o \"Blob\" pelo menu de aplicativos (ou digite: blob)."
+echo "Done! Open \"Blob\" from your app menu (or type: blob)."

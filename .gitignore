@@ -1,18 +1,18 @@
-# Dependências e builds
+# Dependencies and builds
 node_modules/
 client/dist/
 desktop/dist/
 
-# Segredos e dados do servidor (NUNCA vão pro GitHub)
+# Server secrets and data (NEVER pushed to GitHub)
 server/config.json
 server/data/
 server/livekit/livekit.yaml
 server/livekit/*.exe
 MENSAGEM PROS AMIGOS.txt
 
-# Gerado no build a partir do node_modules
+# Generated at build time from node_modules
 client/public/dfn/
 
-# Coisas locais
+# Local stuff
 .claude/
 *.log

@@ -1,4 +1,4 @@
-// Blob Desktop: abre o servidor Blob numa janela e libera microfone, notificações e captura de tela/áudio do PC.
+// Blob Desktop: opens the Blob server in a window and enables microphone, notifications and screen/PC audio capture.
 const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell, Menu, dialog } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('node:path');
@@ -21,10 +21,10 @@ function normalize(url) {
 }
 
 const serverUrl = normalize(cfg.server);
-// Sem HTTPS o Chromium bloqueia microfone/tela; o servidor do Blob é tratado como seguro.
+// Without HTTPS Chromium blocks mic/screen access; the Blob server is treated as secure.
 if (serverUrl) app.commandLine.appendSwitch('unsafely-treat-insecure-origin-as-secure', serverUrl);
 app.commandLine.appendSwitch('disable-features', 'HardwareMediaKeyHandling');
-// RestrictOwnAudio: permite capturar o som do PC SEM o som do próprio Blob (vozes da call não vão pra transmissão).
+// RestrictOwnAudio: capture PC audio WITHOUT Blob's own audio (call voices don't leak into the stream).
 app.commandLine.appendSwitch('enable-features', 'WebRtcAllowInputVolumeAdjustment,RestrictOwnAudio');
 
 let win;
@@ -48,7 +48,7 @@ function createWindow() {
   const showConnect = (error) => win.loadFile(path.join(__dirname, 'connect.html'), { query: { error: error || '', server: serverUrl } });
   if (serverUrl) {
     win.loadFile(path.join(__dirname, 'connect.html'), { query: { loading: '1', server: serverUrl } });
-    // Testa o servidor antes de abrir, pra nunca ficar numa tela preta.
+    // Probe the server before loading it, so we never sit on a black screen.
     const tryServer = async () => {
       try {
         const ctrl = new AbortController();
@@ -57,18 +57,18 @@ function createWindow() {
         clearTimeout(t);
         win.loadURL(serverUrl);
       } catch {
-        showConnect(`O servidor ${serverUrl.replace(/^https?:\/\//, '')} não respondeu. Confira: 1) a Tailscale está ligada e você aceitou o convite; 2) o servidor do Blob está aberto no PC do dono; 3) o firewall do servidor foi liberado.`);
+        showConnect(`The server ${serverUrl.replace(/^https?:\/\//, '')} did not respond. Check that: 1) Tailscale is on and you accepted the invite; 2) the Blob server is running on the owner's PC; 3) the server's firewall is open.`);
       }
     };
     tryServer();
   } else showConnect();
 
   win.webContents.on('did-fail-load', (_e, code, desc, url) => {
-    if (code === -3 || url.startsWith('file:')) return; // abortado / página local
-    showConnect(`Não consegui conectar em ${url} (${desc})`);
+    if (code === -3 || url.startsWith('file:')) return; // aborted / local page
+    showConnect(`Could not connect to ${url} (${desc})`);
   });
 
-  // Links externos abrem no navegador
+  // External links open in the browser
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (!url.startsWith(serverUrl)) shell.openExternal(url);
     return { action: url.startsWith(serverUrl) ? 'allow' : 'deny' };
@@ -87,14 +87,14 @@ app.whenReady().then(() => {
   });
   ses.setPermissionCheckHandler(() => true);
 
-  // Captura de tela: usa a fonte que o usuário escolheu no seletor do Blob.
+  // Screen capture: use the source the user picked in Blob's picker.
   ses.setDisplayMediaRequestHandler(async (_req, callback) => {
     try {
       const sources = await desktopCapturer.getSources({ types: ['screen', 'window'] });
       const chosen = sources.find((s) => s.id === pendingSource?.id) || sources.find((s) => s.id.startsWith('screen'));
       if (!chosen) return callback({});
-      // 'loopbackWithoutChrome' = todo o som do PC, menos o que o próprio Blob toca (vozes, soundboard).
-      // No Windows, testado: som de outros programas entra e o do Blob fica de fora.
+      // 'loopbackWithoutChrome' = all PC audio except what Blob itself plays (voices, soundboard).
+      // Tested on Windows: other apps' audio is captured, Blob's own audio is excluded.
       const audio = process.platform === 'win32' ? 'loopbackWithoutChrome' : 'loopback';
       callback(pendingSource?.audio ? { video: chosen, audio } : { video: chosen });
     } catch (e) {
@@ -124,21 +124,21 @@ app.whenReady().then(() => {
   checkUpdates();
 });
 
-// ---------- Atualização automática (GitHub Releases) ----------
+// ---------- Auto-update (GitHub Releases) ----------
 function checkUpdates() {
   if (!app.isPackaged) return;
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.on('error', (e) => console.warn('[update]', e?.message));
   autoUpdater.on('update-downloaded', async (info) => {
-    // Se a pessoa não está numa call, atualiza na hora; se está, pergunta.
+    // Not in a call: update right away. In a call: ask first.
     let inCall = false;
-    try { inCall = await win?.webContents.executeJavaScript('!!window.__blobVoice?.channelId'); } catch { /* página local */ }
+    try { inCall = await win?.webContents.executeJavaScript('!!window.__blobVoice?.channelId'); } catch { /* local page */ }
     if (!inCall) return autoUpdater.quitAndInstall(true, true);
     const r = await dialog.showMessageBox(win, {
-      type: 'info', buttons: ['Reiniciar e atualizar', 'Depois'], defaultId: 0, cancelId: 1,
-      title: 'Atualização do Blob', message: `Blob ${info.version} baixado!`,
-      detail: 'Reiniciar agora para atualizar? (Se escolher "Depois", atualiza quando você fechar o Blob.)',
+      type: 'info', buttons: ['Restart and update', 'Later'], defaultId: 0, cancelId: 1,
+      title: 'Blob update', message: `Blob ${info.version} downloaded!`,
+      detail: 'Restart now to update? (If you choose "Later", it updates when you close Blob.)',
     });
     if (r.response === 0) autoUpdater.quitAndInstall(true, true);
   });

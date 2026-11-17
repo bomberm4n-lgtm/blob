@@ -88,7 +88,7 @@ export function Tooltip({ text, children, side = 'top' }) {
   );
 }
 
-// Menu de contexto (botão direito).
+// Context menu (right click).
 export function ContextMenu({ x, y, onClose, children }) {
   const ref = useRef();
   useEffect(() => {
@@ -123,8 +123,8 @@ export function fmtTime(ts) {
   const d = new Date(ts);
   const today = new Date();
   const y = new Date(); y.setDate(y.getDate() - 1);
-  const hm = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  if (d.toDateString() === today.toDateString()) return 'Hoje às ' + hm;
-  if (d.toDateString() === y.toDateString()) return 'Ontem às ' + hm;
-  return d.toLocaleDateString('pt-BR') + ' ' + hm;
+  const hm = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  if (d.toDateString() === today.toDateString()) return 'Today at ' + hm;
+  if (d.toDateString() === y.toDateString()) return 'Yesterday at ' + hm;
+  return d.toLocaleDateString('en-US') + ' ' + hm;
 }

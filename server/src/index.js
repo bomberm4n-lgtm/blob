@@ -1,4 +1,4 @@
-// Blob - servidor principal: contas, servidores, canais, chat, soundboard e tokens de voz.
+// Blob - main server: accounts, servers, channels, chat, soundboard and voice tokens.
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
@@ -16,7 +16,7 @@ const dataDir = path.join(root, 'data');
 const uploadDir = path.join(dataDir, 'uploads');
 fs.mkdirSync(uploadDir, { recursive: true });
 
-// ---------- Banco ----------
+// ---------- Database ----------
 const db = new DatabaseSync(path.join(dataDir, 'blob.db'));
 db.exec(`
 PRAGMA journal_mode = WAL;
@@ -63,17 +63,17 @@ function createServer(name, ownerId) {
   const sid = Number(r.lastInsertRowid);
   db.prepare('INSERT INTO members VALUES (?,?)').run(sid, ownerId);
   const ch = db.prepare('INSERT INTO channels (server_id, name, type, position) VALUES (?,?,?,?)');
-  ch.run(sid, 'geral', 'text', 0);
+  ch.run(sid, 'general', 'text', 0);
   ch.run(sid, 'memes', 'text', 1);
-  ch.run(sid, 'Sala 1', 'voice', 2);
-  ch.run(sid, 'Sala 2', 'voice', 3);
+  ch.run(sid, 'Room 1', 'voice', 2);
+  ch.run(sid, 'Room 2', 'voice', 3);
   return sid;
 }
 
 const isMember = (sid, uid) => !!db.prepare('SELECT 1 FROM members WHERE server_id=? AND user_id=?').get(sid, uid);
 const channelServer = (cid) => db.prepare('SELECT * FROM channels WHERE id=?').get(cid);
 
-// ---------- Estado em memória (presença e voz) ----------
+// ---------- In-memory state (presence and voice) ----------
 const sockets = new Map(); // userId -> Set<ws>
 const voice = new Map(); // userId -> { channelId, muted, deafened, streaming, video }
 
@@ -112,23 +112,23 @@ function bootstrap(uid) {
 const app = express();
 app.disable('x-powered-by');
 
-// Segurança 1: só aceita conexões do próprio PC, da rede de casa e da Tailscale (100.64.0.0/10).
+// Security 1: only accept connections from this PC, the home network and Tailscale (100.64.0.0/10).
 function allowedIp(raw = '') {
   const ip = raw.replace(/^::ffff:/, '');
   if (ip === '127.0.0.1' || ip === '::1') return true;
   const p = ip.split('.').map(Number);
-  if (p.length !== 4 || p.some(Number.isNaN)) return ip.startsWith('fd7a:115c:a1e0:'); // IPv6 da Tailscale
+  if (p.length !== 4 || p.some(Number.isNaN)) return ip.startsWith('fd7a:115c:a1e0:'); // Tailscale IPv6
   return p[0] === 10 || (p[0] === 192 && p[1] === 168) || (p[0] === 172 && p[1] >= 16 && p[1] <= 31) || (p[0] === 100 && p[1] >= 64 && p[1] <= 127);
 }
 app.use((req, res, next) => (allowedIp(req.socket.remoteAddress) ? next() : res.status(403).end()));
 
-// Segurança 2: limita tentativas de login/cadastro (10 por 15 min por IP).
+// Security 2: rate-limit login/register attempts (10 per 15 min per IP).
 const attempts = new Map();
 function rateLimit(req, res, next) {
   const ip = req.socket.remoteAddress;
   const now = Date.now();
   const a = (attempts.get(ip) || []).filter((t) => now - t < 15 * 60 * 1000);
-  if (a.length >= 10) return res.status(429).json({ error: 'Muitas tentativas. Espere 15 minutos.' });
+  if (a.length >= 10) return res.status(429).json({ error: 'Too many attempts. Wait 15 minutes.' });
   a.push(now);
   attempts.set(ip, a);
   next();
@@ -149,7 +149,7 @@ const upload = multer({
 function auth(req, res, next) {
   const token = (req.headers.authorization || '').replace('Bearer ', '');
   const s = token && db.prepare('SELECT user_id FROM sessions WHERE token=?').get(token);
-  if (!s) return res.status(401).json({ error: 'Não autenticado' });
+  if (!s) return res.status(401).json({ error: 'Not authenticated' });
   req.uid = s.user_id;
   next();
 }
@@ -157,13 +157,13 @@ const fail = (res, code, error) => res.status(code).json({ error });
 
 app.post('/api/register', (req, res) => {
   const { username, password, code } = req.body || {};
-  if (!/^[\w.\- ]{2,24}$/u.test(username || '')) return fail(res, 400, 'Nome de usuário inválido (2-24 caracteres)');
-  if (!password || password.length < 4) return fail(res, 400, 'Senha muito curta');
-  if (cfg.registerCode && code !== cfg.registerCode) return fail(res, 403, 'Código de convite do Blob incorreto');
-  if (db.prepare('SELECT 1 FROM users WHERE username=?').get(username)) return fail(res, 409, 'Esse nome já existe');
+  if (!/^[\w.\- ]{2,24}$/u.test(username || '')) return fail(res, 400, 'Invalid username (2-24 characters)');
+  if (!password || password.length < 4) return fail(res, 400, 'Password too short');
+  if (cfg.registerCode && code !== cfg.registerCode) return fail(res, 403, 'Wrong Blob invite code');
+  if (db.prepare('SELECT 1 FROM users WHERE username=?').get(username)) return fail(res, 409, 'That name is already taken');
   const r = db.prepare('INSERT INTO users (username, pass, color, created_at) VALUES (?,?,?,?)').run(username.trim(), hashPass(password), pick(COLORS), now());
   const uid = Number(r.lastInsertRowid);
-  // Primeiro usuário cria o servidor principal; os outros entram nele automaticamente.
+  // The first user creates the main server; everyone else joins it automatically.
   const first = db.prepare('SELECT id FROM servers ORDER BY id LIMIT 1').get();
   if (first) {
     db.prepare('INSERT OR IGNORE INTO members VALUES (?,?)').run(first.id, uid);
@@ -177,7 +177,7 @@ app.post('/api/register', (req, res) => {
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body || {};
   const u = db.prepare('SELECT * FROM users WHERE username=?').get(username || '');
-  if (!u || !checkPass(password || '', u.pass)) return fail(res, 401, 'Usuário ou senha incorretos');
+  if (!u || !checkPass(password || '', u.pass)) return fail(res, 401, 'Wrong username or password');
   const token = crypto.randomBytes(32).toString('hex');
   db.prepare('INSERT INTO sessions VALUES (?,?)').run(token, u.id);
   res.json({ token });
@@ -199,7 +199,7 @@ app.patch('/api/me', auth, (req, res) => {
 });
 
 app.post('/api/me/avatar', auth, upload.single('file'), (req, res) => {
-  if (!req.file || !/^image\//.test(req.file.mimetype)) return fail(res, 400, 'Envie uma imagem');
+  if (!req.file || !/^image\//.test(req.file.mimetype)) return fail(res, 400, 'Please upload an image');
   db.prepare('UPDATE users SET avatar=? WHERE id=?').run('/uploads/' + req.file.filename, req.uid);
   broadcastRelated(req.uid, { t: 'refresh' });
   res.json({ ok: true });
@@ -211,10 +211,10 @@ app.delete('/api/me/avatar', auth, (req, res) => {
   res.json({ ok: true });
 });
 
-// Servidores
+// Servers
 app.post('/api/servers', auth, (req, res) => {
   const name = String(req.body?.name || '').trim().slice(0, 40);
-  if (!name) return fail(res, 400, 'Nome vazio');
+  if (!name) return fail(res, 400, 'Name is empty');
   const id = createServer(name, req.uid);
   sendTo(req.uid, { t: 'refresh' });
   res.json({ id });
@@ -222,7 +222,7 @@ app.post('/api/servers', auth, (req, res) => {
 
 app.post('/api/join', auth, (req, res) => {
   const s = db.prepare('SELECT * FROM servers WHERE invite=?').get(String(req.body?.invite || '').trim());
-  if (!s) return fail(res, 404, 'Convite inválido');
+  if (!s) return fail(res, 404, 'Invalid invite');
   db.prepare('INSERT OR IGNORE INTO members VALUES (?,?)').run(s.id, req.uid);
   broadcastServer(s.id, { t: 'refresh' });
   res.json({ id: s.id });
@@ -230,7 +230,7 @@ app.post('/api/join', auth, (req, res) => {
 
 app.patch('/api/servers/:id', auth, (req, res) => {
   const s = db.prepare('SELECT * FROM servers WHERE id=?').get(req.params.id);
-  if (!s || s.owner_id !== req.uid) return fail(res, 403, 'Só o dono pode editar');
+  if (!s || s.owner_id !== req.uid) return fail(res, 403, 'Only the owner can edit this');
   const name = String(req.body?.name || '').trim().slice(0, 40);
   if (name) db.prepare('UPDATE servers SET name=? WHERE id=?').run(name, s.id);
   broadcastServer(s.id, { t: 'refresh' });
@@ -239,8 +239,8 @@ app.patch('/api/servers/:id', auth, (req, res) => {
 
 app.post('/api/servers/:id/icon', auth, upload.single('file'), (req, res) => {
   const s = db.prepare('SELECT * FROM servers WHERE id=?').get(req.params.id);
-  if (!s || s.owner_id !== req.uid) return fail(res, 403, 'Só o dono pode editar');
-  if (!req.file || !/^image\//.test(req.file.mimetype)) return fail(res, 400, 'Envie uma imagem');
+  if (!s || s.owner_id !== req.uid) return fail(res, 403, 'Only the owner can edit this');
+  if (!req.file || !/^image\//.test(req.file.mimetype)) return fail(res, 400, 'Please upload an image');
   db.prepare('UPDATE servers SET icon=? WHERE id=?').run('/uploads/' + req.file.filename, s.id);
   broadcastServer(s.id, { t: 'refresh' });
   res.json({ ok: true });
@@ -256,21 +256,21 @@ app.post('/api/servers/:id/leave', auth, (req, res) => {
 
 app.delete('/api/servers/:id', auth, (req, res) => {
   const s = db.prepare('SELECT * FROM servers WHERE id=?').get(req.params.id);
-  if (!s || s.owner_id !== req.uid) return fail(res, 403, 'Só o dono pode apagar');
+  if (!s || s.owner_id !== req.uid) return fail(res, 403, 'Only the owner can delete this');
   const members = db.prepare('SELECT user_id FROM members WHERE server_id=?').all(s.id);
   db.prepare('DELETE FROM servers WHERE id=?').run(s.id);
   for (const m of members) sendTo(m.user_id, { t: 'refresh' });
   res.json({ ok: true });
 });
 
-// Canais
+// Channels
 app.post('/api/servers/:id/channels', auth, (req, res) => {
   const sid = Number(req.params.id);
-  if (!isMember(sid, req.uid)) return fail(res, 403, 'Sem acesso');
+  if (!isMember(sid, req.uid)) return fail(res, 403, 'No access');
   const type = req.body?.type === 'voice' ? 'voice' : 'text';
   let name = String(req.body?.name || '').trim().slice(0, 40);
   if (type === 'text') name = name.toLowerCase().replace(/\s+/g, '-');
-  if (!name) return fail(res, 400, 'Nome vazio');
+  if (!name) return fail(res, 400, 'Name is empty');
   const pos = db.prepare('SELECT COALESCE(MAX(position),0)+1 p FROM channels WHERE server_id=?').get(sid).p;
   db.prepare('INSERT INTO channels (server_id, name, type, position) VALUES (?,?,?,?)').run(sid, name, type, pos);
   broadcastServer(sid, { t: 'refresh' });
@@ -279,7 +279,7 @@ app.post('/api/servers/:id/channels', auth, (req, res) => {
 
 app.patch('/api/channels/:id', auth, (req, res) => {
   const ch = channelServer(req.params.id);
-  if (!ch || !isMember(ch.server_id, req.uid)) return fail(res, 403, 'Sem acesso');
+  if (!ch || !isMember(ch.server_id, req.uid)) return fail(res, 403, 'No access');
   let name = String(req.body?.name || '').trim().slice(0, 40);
   if (ch.type === 'text') name = name.toLowerCase().replace(/\s+/g, '-');
   if (name) db.prepare('UPDATE channels SET name=? WHERE id=?').run(name, ch.id);
@@ -289,13 +289,13 @@ app.patch('/api/channels/:id', auth, (req, res) => {
 
 app.delete('/api/channels/:id', auth, (req, res) => {
   const ch = channelServer(req.params.id);
-  if (!ch || !isMember(ch.server_id, req.uid)) return fail(res, 403, 'Sem acesso');
+  if (!ch || !isMember(ch.server_id, req.uid)) return fail(res, 403, 'No access');
   db.prepare('DELETE FROM channels WHERE id=?').run(ch.id);
   broadcastServer(ch.server_id, { t: 'refresh' });
   res.json({ ok: true });
 });
 
-// Mensagens
+// Messages
 const msgSelect = `SELECT m.*, u.username, u.color, u.avatar FROM messages m JOIN users u ON u.id=m.user_id`;
 function withReactions(msgs) {
   const q = db.prepare('SELECT emoji, user_id FROM reactions WHERE message_id=?');
@@ -308,7 +308,7 @@ function withReactions(msgs) {
 
 app.get('/api/channels/:id/messages', auth, (req, res) => {
   const ch = channelServer(req.params.id);
-  if (!ch || !isMember(ch.server_id, req.uid)) return fail(res, 403, 'Sem acesso');
+  if (!ch || !isMember(ch.server_id, req.uid)) return fail(res, 403, 'No access');
   const before = Number(req.query.before) || Number.MAX_SAFE_INTEGER;
   const rows = db.prepare(`${msgSelect} WHERE m.channel_id=? AND m.id<? ORDER BY m.id DESC LIMIT 60`).all(ch.id, before).reverse();
   res.json(withReactions(rows));
@@ -316,10 +316,10 @@ app.get('/api/channels/:id/messages', auth, (req, res) => {
 
 app.post('/api/channels/:id/messages', auth, upload.single('file'), (req, res) => {
   const ch = channelServer(req.params.id);
-  if (!ch || !isMember(ch.server_id, req.uid)) return fail(res, 403, 'Sem acesso');
+  if (!ch || !isMember(ch.server_id, req.uid)) return fail(res, 403, 'No access');
   const content = String(req.body?.content || '').slice(0, 4000);
   const attachment = req.file ? JSON.stringify({ url: '/uploads/' + req.file.filename, name: req.file.originalname, type: req.file.mimetype, size: req.file.size }) : null;
-  if (!content.trim() && !attachment) return fail(res, 400, 'Mensagem vazia');
+  if (!content.trim() && !attachment) return fail(res, 400, 'Message is empty');
   const r = db.prepare('INSERT INTO messages (channel_id, user_id, content, attachment, created_at) VALUES (?,?,?,?,?)').run(ch.id, req.uid, content, attachment, now());
   const msg = withReactions([db.prepare(`${msgSelect} WHERE m.id=?`).get(r.lastInsertRowid)])[0];
   broadcastServer(ch.server_id, { t: 'message', msg, serverId: ch.server_id });
@@ -329,14 +329,14 @@ app.post('/api/channels/:id/messages', auth, upload.single('file'), (req, res) =
 function msgAccess(req, res) {
   const m = db.prepare('SELECT * FROM messages WHERE id=?').get(req.params.id);
   const ch = m && channelServer(m.channel_id);
-  if (!m || !isMember(ch.server_id, req.uid)) { fail(res, 403, 'Sem acesso'); return null; }
+  if (!m || !isMember(ch.server_id, req.uid)) { fail(res, 403, 'No access'); return null; }
   return { m, ch };
 }
 const pushMsgUpdate = (id, sid) => broadcastServer(sid, { t: 'message_update', msg: withReactions([db.prepare(`${msgSelect} WHERE m.id=?`).get(id)])[0] });
 
 app.patch('/api/messages/:id', auth, (req, res) => {
   const a = msgAccess(req, res); if (!a) return;
-  if (a.m.user_id !== req.uid) return fail(res, 403, 'Só o autor pode editar');
+  if (a.m.user_id !== req.uid) return fail(res, 403, 'Only the author can edit this');
   db.prepare('UPDATE messages SET content=?, edited_at=? WHERE id=?').run(String(req.body?.content || '').slice(0, 4000), now(), a.m.id);
   pushMsgUpdate(a.m.id, a.ch.server_id);
   res.json({ ok: true });
@@ -345,7 +345,7 @@ app.patch('/api/messages/:id', auth, (req, res) => {
 app.delete('/api/messages/:id', auth, (req, res) => {
   const a = msgAccess(req, res); if (!a) return;
   const owner = db.prepare('SELECT owner_id FROM servers WHERE id=?').get(a.ch.server_id).owner_id;
-  if (a.m.user_id !== req.uid && owner !== req.uid) return fail(res, 403, 'Sem permissão');
+  if (a.m.user_id !== req.uid && owner !== req.uid) return fail(res, 403, 'No permission');
   db.prepare('DELETE FROM messages WHERE id=?').run(a.m.id);
   broadcastServer(a.ch.server_id, { t: 'message_delete', id: a.m.id, channelId: a.ch.id });
   res.json({ ok: true });
@@ -354,7 +354,7 @@ app.delete('/api/messages/:id', auth, (req, res) => {
 app.post('/api/messages/:id/react', auth, (req, res) => {
   const a = msgAccess(req, res); if (!a) return;
   const emoji = String(req.body?.emoji || '').slice(0, 16);
-  if (!emoji) return fail(res, 400, 'Emoji vazio');
+  if (!emoji) return fail(res, 400, 'Emoji is empty');
   const exists = db.prepare('SELECT 1 FROM reactions WHERE message_id=? AND user_id=? AND emoji=?').get(a.m.id, req.uid, emoji);
   if (exists) db.prepare('DELETE FROM reactions WHERE message_id=? AND user_id=? AND emoji=?').run(a.m.id, req.uid, emoji);
   else db.prepare('INSERT INTO reactions VALUES (?,?,?)').run(a.m.id, req.uid, emoji);
@@ -365,9 +365,9 @@ app.post('/api/messages/:id/react', auth, (req, res) => {
 // Soundboard
 app.post('/api/servers/:id/sounds', auth, upload.single('file'), (req, res) => {
   const sid = Number(req.params.id);
-  if (!isMember(sid, req.uid)) return fail(res, 403, 'Sem acesso');
-  if (!req.file || !/^audio\//.test(req.file.mimetype)) return fail(res, 400, 'Envie um arquivo de áudio (mp3, ogg, wav)');
-  if (req.file.size > 5 * 1024 * 1024) return fail(res, 400, 'Som muito grande (máx 5MB)');
+  if (!isMember(sid, req.uid)) return fail(res, 403, 'No access');
+  if (!req.file || !/^audio\//.test(req.file.mimetype)) return fail(res, 400, 'Please upload an audio file (mp3, ogg, wav)');
+  if (req.file.size > 5 * 1024 * 1024) return fail(res, 400, 'Sound too large (max 5MB)');
   const name = String(req.body?.name || req.file.originalname.replace(/\.[^.]+$/, '')).slice(0, 32);
   const emoji = String(req.body?.emoji || '🔊').slice(0, 8);
   db.prepare('INSERT INTO sounds (server_id, name, emoji, file, user_id) VALUES (?,?,?,?,?)').run(sid, name, emoji, '/uploads/' + req.file.filename, req.uid);
@@ -377,16 +377,16 @@ app.post('/api/servers/:id/sounds', auth, upload.single('file'), (req, res) => {
 
 app.delete('/api/sounds/:id', auth, (req, res) => {
   const s = db.prepare('SELECT * FROM sounds WHERE id=?').get(req.params.id);
-  if (!s || !isMember(s.server_id, req.uid)) return fail(res, 403, 'Sem acesso');
+  if (!s || !isMember(s.server_id, req.uid)) return fail(res, 403, 'No access');
   db.prepare('DELETE FROM sounds WHERE id=?').run(s.id);
   broadcastServer(s.server_id, { t: 'refresh' });
   res.json({ ok: true });
 });
 
-// Voz: token do LiveKit
+// Voice: LiveKit token
 app.get('/api/voice/token', auth, async (req, res) => {
   const ch = channelServer(req.query.channelId);
-  if (!ch || ch.type !== 'voice' || !isMember(ch.server_id, req.uid)) return fail(res, 403, 'Sem acesso');
+  if (!ch || ch.type !== 'voice' || !isMember(ch.server_id, req.uid)) return fail(res, 403, 'No access');
   const u = db.prepare('SELECT * FROM users WHERE id=?').get(req.uid);
   const at = new AccessToken(cfg.livekitApiKey, cfg.livekitApiSecret, {
     identity: String(u.id), name: u.username, ttl: '12h',
@@ -398,18 +398,18 @@ app.get('/api/voice/token', auth, async (req, res) => {
   res.json({ token: await at.toJwt(), url: `${proto}://${host}:${cfg.livekitPort}` });
 });
 
-// Cliente web compilado
+// Built web client
 const clientDist = path.join(root, '..', 'client', 'dist');
 app.use(express.static(clientDist));
 app.get(/^\/(?!api|uploads|ws).*/, (_req, res) => {
   const index = path.join(clientDist, 'index.html');
   if (fs.existsSync(index)) res.sendFile(index);
-  else res.status(503).send('Cliente ainda não compilado. Rode "npm run build" na pasta client.');
+  else res.status(503).send('Client not built yet. Run "npm run build" in the client folder.');
 });
 
 app.use((err, _req, res, _next) => {
   console.error(err);
-  res.status(500).json({ error: err.message || 'Erro interno' });
+  res.status(500).json({ error: err.message || 'Internal error' });
 });
 
 // ---------- WebSocket ----------
@@ -422,7 +422,7 @@ function setVoice(uid, state) {
   broadcastRelated(uid, { t: 'voice', userId: uid, state: state || null });
 }
 
-// Versão do app web (muda a cada build): os apps abertos recarregam sozinhos quando ela muda.
+// Web app version (changes on every build): open apps reload themselves when it changes.
 let cachedVersion = null;
 function clientVersion() {
   if (cachedVersion) return cachedVersion;
@@ -430,17 +430,17 @@ function clientVersion() {
   return cachedVersion;
 }
 
-// Atualização automática: se a pasta é um clone do GitHub, confere a cada 5 min se há versão nova.
-// Havendo, sai com código 42 — o "Iniciar Servidor Blob.bat" baixa, recompila e reinicia sozinho.
+// Auto-update: if this folder is a GitHub clone, check for a new version every 5 minutes.
+// If there is one, exit with code 42 — "Start Blob Server.bat" pulls, rebuilds and restarts.
 import('node:child_process').then(({ execFile }) => {
   const repoDir = path.join(root, '..');
   if (!fs.existsSync(path.join(repoDir, '.git'))) return;
   const git = (...args) => new Promise((ok) => execFile('git', args, { cwd: repoDir, windowsHide: true }, (err, out) => ok(err ? null : out.trim())));
   const check = async () => {
-    if (!(await git('fetch', '--quiet'))) { /* sem internet: tenta depois */ }
+    if (!(await git('fetch', '--quiet'))) { /* offline: try again later */ }
     const [head, up] = await Promise.all([git('rev-parse', 'HEAD'), git('rev-parse', '@{u}')]);
     if (head && up && head !== up) {
-      console.log('[blob] Nova versão no GitHub! Reiniciando para atualizar...');
+      console.log('[blob] New version on GitHub! Restarting to update...');
       process.exit(42);
     }
   };
@@ -496,5 +496,5 @@ setInterval(() => {
 }, 20000);
 
 server.listen(cfg.port, '0.0.0.0', () => {
-  console.log(`[blob] servidor rodando em http://localhost:${cfg.port}`);
+  console.log(`[blob] server running at http://localhost:${cfg.port}`);
 });
