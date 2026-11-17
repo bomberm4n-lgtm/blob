@@ -145,13 +145,12 @@ function VoiceTab() {
     if (!testing) return;
     let alive = true;
     let handle;
-    startMicTest(s, { onLevels: (l) => alive && setLevels(l), monitor: hearMe, outputDevice: s.outputDevice })
+    startMicTest(hearMe ? { ...s, echo: false } : s, { onLevels: (l) => alive && setLevels(l), monitor: hearMe, outputDevice: s.outputDevice })
       .then((h) => { if (alive) { handle = h; testRef.current = h; } else h.stop(); })
       .catch(() => setTesting(false));
     return () => { alive = false; handle?.stop(); testRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [testing, s.inputDevice, s.noise, s.echo, s.agc, s.gateEnabled, gateDbSettled, s.dfAtten, s.outputDevice]);
-  useEffect(() => { testRef.current?.setMonitor(hearMe); }, [hearMe]);
+  }, [testing, hearMe, s.inputDevice, s.noise, s.echo, s.agc, s.gateEnabled, gateDbSettled, s.dfAtten, s.outputDevice]);
 
   const set = (patch, restart = true) => {
     voice.saveSettings(patch);
@@ -192,7 +191,7 @@ function VoiceTab() {
           <div className="mic-meter-row"><span>Microphone (before AI)</span><div className="meter"><div className="meter-fill raw" style={{ width: pct(levels.raw) + '%' }} /></div><b>{Math.round(levels.raw)} dB</b></div>
           <div className="mic-meter-row"><span>After AI {s.gateEnabled && '(gate line)'}</span><div className="meter"><div className="meter-fill" style={{ width: pct(levels.gate) + '%' }} />{s.gateEnabled && <div className="meter-gate" style={{ left: gatePct + '%' }} />}</div><b>{Math.round(levels.gate)} dB</b></div>
           <div className="mic-meter-row"><span>What others hear</span><div className="meter"><div className={'meter-fill' + (levels.out > -70 ? ' live' : '')} style={{ width: pct(levels.out) + '%' }} /></div><b>{levels.out > -70 ? 'sending' : 'silent'}</b></div>
-          <small className="muted">{MODE_LABEL[levels.mode] || 'Starting…'}{hearMe && ' · use headphones to avoid feedback'}</small>
+          <small className="muted">{MODE_LABEL[levels.mode] || 'Starting…'}{hearMe && ' · use headphones · echo cancellation is paused while you hear yourself (it would cut your own voice)'}</small>
         </div>
       )}
 
@@ -221,7 +220,7 @@ function VoiceTab() {
       )}
 
       <div className="toggles">
-        <Toggle label="Echo cancellation" checked={s.echo} onChange={(x) => set({ echo: x })} />
+        <Toggle label="Echo cancellation (turn off if you use headphones)" checked={s.echo} onChange={(x) => set({ echo: x })} />
         <Toggle label="Automatic gain control" checked={s.agc} onChange={(x) => set({ agc: x })} />
         <Toggle label="Manual input sensitivity (noise gate)" checked={s.gateEnabled && s.noise !== 'deepfilter'} disabled={s.noise === 'deepfilter'}
           onChange={(x) => set({ gateEnabled: x })} />
