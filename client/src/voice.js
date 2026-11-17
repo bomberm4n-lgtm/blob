@@ -91,6 +91,8 @@ class VoiceManager {
 
   async join(channelId, serverId) {
     if (this.channelId === channelId && this.room) return;
+    // Switching rooms: play a "leaving" swoop now; the join chime plays once the new room connects.
+    if (this.channelId && this.channelId !== channelId) this.playUiSound('switch');
     await this.leave(true);
     this.channelId = channelId;
     this.serverId = serverId;
@@ -466,7 +468,7 @@ class VoiceManager {
   playUiSound(kind) {
     try {
       const ctx = (this.uiCtx ||= new AudioContext());
-      const notes = { join: [523, 784], leave: [784, 523], mute: [440, 330], unmute: [330, 440], stream: [660, 880, 990] }[kind];
+      const notes = { join: [523, 784], leave: [784, 523], switch: [880, 698, 523], mute: [440, 330], unmute: [330, 440], stream: [660, 880, 990] }[kind];
       if (!notes) return;
       const t0 = ctx.currentTime;
       notes.forEach((f, i) => {
