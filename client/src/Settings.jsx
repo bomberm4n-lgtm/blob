@@ -3,6 +3,7 @@ import { api } from './api';
 import { voice, SHARE_RESOLUTIONS } from './voice';
 import { startMicMeter } from './noise';
 import { Avatar, Icon, Modal, Slider, useVoice } from './ui';
+import { AddSoundModal } from './SoundEditor';
 
 function useDevices() {
   const [devices, setDevices] = useState([]);
@@ -375,24 +376,8 @@ export function ShareModal({ onClose }) {
 export function Soundboard({ server, onClose }) {
   const v = useVoice();
   const [adding, setAdding] = useState(false);
-  const [file, setFile] = useState(null);
-  const [name, setName] = useState('');
-  const [emoji, setEmoji] = useState('🔊');
-  const [err, setErr] = useState('');
   const [filter, setFilter] = useState('');
   const sounds = (server?.sounds || []).filter((s) => s.name.toLowerCase().includes(filter.toLowerCase()));
-
-  const upload = async () => {
-    setErr('');
-    const f = new FormData();
-    f.append('file', file);
-    f.append('name', name || file.name.replace(/\.[^.]+$/, ''));
-    f.append('emoji', emoji);
-    try {
-      await api(`/api/servers/${server.id}/sounds`, { method: 'POST', form: f });
-      setAdding(false); setFile(null); setName('');
-    } catch (e) { setErr(e.message); }
-  };
 
   return (
     <div className="soundboard-pop">
@@ -418,22 +403,7 @@ export function Soundboard({ server, onClose }) {
         ))}
         <button className="sb-btn add" onClick={() => setAdding(true)}><Icon name="plus" /> <span className="sb-name">Add sound</span></button>
       </div>
-      {adding && (
-        <div className="sb-add">
-          <label className="btn">{file ? file.name : 'Choose a file (mp3, ogg, wav — up to 5MB)'}
-            <input type="file" accept="audio/*" hidden onChange={(e) => { setFile(e.target.files[0]); if (!name) setName(e.target.files[0]?.name.replace(/\.[^.]+$/, '').slice(0, 32)); }} />
-          </label>
-          <div className="sb-add-row">
-            <input className="emoji-input" value={emoji} onChange={(e) => setEmoji(e.target.value)} maxLength={4} />
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Sound name" maxLength={32} />
-          </div>
-          {err && <div className="form-error">{err}</div>}
-          <div className="sb-add-row">
-            <button className="btn" onClick={() => setAdding(false)}>Cancel</button>
-            <button className="btn primary" disabled={!file} onClick={upload}>Upload</button>
-          </div>
-        </div>
-      )}
+      {adding && <AddSoundModal server={server} onClose={() => setAdding(false)} />}
     </div>
   );
 }

@@ -5,7 +5,8 @@ import { Avatar, ContextMenu, Icon, Modal, Slider, Tooltip, useVoice } from './u
 import Chat from './Chat';
 import VoiceView from './VoiceView';
 import { SettingsModal, ShareModal, Soundboard } from './Settings';
-import { AssignTags, ManageTagsModal, TagBadges, TagPills } from './Tags';
+import { AssignTags, ManageTagsModal, TagBadges } from './Tags';
+import { AvatarFx, MyProfilePopout, ProfileCard, ProfileEditor } from './Profile';
 
 export default function App() {
   const [data, setData] = useState(null);
@@ -241,11 +242,16 @@ export default function App() {
 
         {/* User panel */}
         <div className="user-panel">
-          {statusMenu && <StatusMenu current={myPresence} onClose={() => setStatusMenu(false)} onPick={(p) => { setMyPresence(p); setStatusMenu(false); api('/api/me', { method: 'PATCH', body: { presence: p } }).catch(() => {}); }} />}
+          {statusMenu && (
+            <MyProfilePopout me={me} server={server} presence={myPresence} onClose={() => setStatusMenu(false)}
+              onPresence={(p) => { setMyPresence(p); api('/api/me', { method: 'PATCH', body: { presence: p } }).catch(() => {}); }}
+              onEditProfile={() => { setStatusMenu(false); setModal({ type: 'profile' }); }}
+              onSettings={() => { setStatusMenu(false); setModal({ type: 'settings' }); }} />
+          )}
           <div className="user-panel-info" onClick={() => setModal({ type: 'settings', tab: 'profile' })}>
-            <Tooltip text="Set status">
+            <Tooltip text="Profile & status">
               <div className="user-panel-avatar" onClick={(e) => { e.stopPropagation(); setStatusMenu((x) => !x); }}>
-                <Avatar user={me} size={32} status={myPresence} speaking={v.speaking.has(String(me.id))} />
+                <AvatarFx fx={me.fx} size={32}><Avatar user={me} size={32} status={myPresence} speaking={v.speaking.has(String(me.id))} /></AvatarFx>
               </div>
             </Tooltip>
             <div className="user-panel-names">
@@ -281,15 +287,15 @@ export default function App() {
             messages={messages[channel.id]} setMessages={(fn) => setMessages((ms) => ({ ...ms, [channel.id]: fn(ms[channel.id]) }))}
             typingNames={typingNames} socket={socketRef.current}
             showMembers={showMembers} toggleMembers={() => setShowMembers((x) => !x)}
-            members={showMembers && <MemberList server={server} presence={{ ...presence, [me.id]: myPresence === 'invisible' ? 'invisible' : myPresence }} voiceStates={voiceStates} onUser={(e, u) => setCtx({ x: e.clientX, y: e.clientY, type: 'user', user: u })} />} />
+            members={showMembers && <MemberList server={server} presence={{ ...presence, [me.id]: myPresence }} voiceStates={voiceStates} onUser={(e, u) => setCtx({ x: e.clientX, y: e.clientY, type: 'user', user: u })} />} />
         ) : (
           <div className="empty-main"><img src="/blob.svg" alt="" /><p>Create a channel to get started.</p></div>
         )}
       </main>
 
       {ctx && (
-        <ContextMenu x={ctx.x} y={ctx.y} onClose={() => setCtx(null)}>
-          <CtxContent ctx={ctx} me={me} server={server} close={() => setCtx(null)} setModal={setModal} />
+        <ContextMenu x={ctx.x} y={ctx.y} onClose={() => setCtx(null)} className={ctx.type === 'user' ? 'ctx-card' : ''}>
+          <CtxContent ctx={ctx} me={me} server={server} presence={{ ...presence, [me.id]: myPresence }} close={() => setCtx(null)} setModal={setModal} />
         </ContextMenu>
       )}
 
@@ -302,6 +308,7 @@ export default function App() {
       {modal?.type === 'invite' && <InviteModal server={modal.server} onClose={() => setModal(null)} />}
       {modal?.type === 'rename' && <RenameModal {...modal} onClose={() => setModal(null)} />}
       {modal?.type === 'tags' && server && <ManageTagsModal server={server} onClose={() => setModal(null)} />}
+      {modal?.type === 'profile' && <ProfileEditor me={me} server={server} presence={myPresence} onClose={() => setModal(null)} />}
     </div>
   );
 }
@@ -320,36 +327,6 @@ function ChannelGroup({ title, onAdd }) {
 }
 
 const PRESENCE_LABEL = { online: 'Online', idle: 'Idle', dnd: 'Do Not Disturb', invisible: 'Invisible' };
-const PRESENCE_OPTIONS = [
-  ['online', 'Online', ''],
-  ['idle', 'Idle', 'You look away from keyboard'],
-  ['dnd', 'Do Not Disturb', "You won't get desktop notifications"],
-  ['invisible', 'Invisible', 'You look offline, but can still use Blob'],
-];
-
-function StatusMenu({ current, onPick, onClose }) {
-  useEffect(() => {
-    const close = (e) => { if (!e.target.closest?.('.status-menu, .user-panel-avatar')) onClose(); };
-    const esc = (e) => e.key === 'Escape' && onClose();
-    window.addEventListener('mousedown', close);
-    window.addEventListener('keydown', esc);
-    return () => { window.removeEventListener('mousedown', close); window.removeEventListener('keydown', esc); };
-  }, [onClose]);
-  return (
-    <div className="status-menu">
-      {PRESENCE_OPTIONS.map(([k, label, desc], i) => (
-        <Fragment key={k}>
-          {i === 1 && <div className="ctx-sep" />}
-          <div className={'status-opt' + (current === k ? ' active' : '')} onClick={() => onPick(k)}>
-            <span className={'status-icon ' + k} />
-            <div><b>{label}</b>{desc && <small>{desc}</small>}</div>
-          </div>
-        </Fragment>
-      ))}
-    </div>
-  );
-}
-
 function MemberList({ server, presence, voiceStates, onUser }) {
   const statusOf = (u) => presence[u.id] || 'offline';
   const isOnline = (u) => !['offline', 'invisible'].includes(statusOf(u));
@@ -357,7 +334,7 @@ function MemberList({ server, presence, voiceStates, onUser }) {
   const off = server.members.filter((u) => !isOnline(u));
   const row = (u, isOn) => (
     <div key={u.id} className={'member' + (isOn ? '' : ' offline')} onClick={(e) => onUser(e, u)} onContextMenu={(e) => { e.preventDefault(); onUser(e, u); }}>
-      <Avatar user={u} size={32} status={statusOf(u)} />
+      <AvatarFx fx={u.fx} size={32}><Avatar user={u} size={32} status={statusOf(u)} /></AvatarFx>
       <div className="member-names">
         <span className="member-name" style={{ color: isOn ? u.color : undefined }}>{u.username}{u.id === server.owner_id && ' 👑'}<TagBadges user={u} server={server} /></span>
         {voiceStates[u.id] ? <small>🔊 In a call{voiceStates[u.id].streaming && ' • streaming'}</small> : u.status && <small>{u.status}</small>}
@@ -374,7 +351,7 @@ function MemberList({ server, presence, voiceStates, onUser }) {
   );
 }
 
-function CtxContent({ ctx, me, server, close, setModal }) {
+function CtxContent({ ctx, me, server, presence = {}, close, setModal }) {
   const v = useVoice();
   if (ctx.type === 'server') {
     const s = ctx.server;
@@ -416,13 +393,8 @@ function CtxContent({ ctx, me, server, close, setModal }) {
     const isMe = u.id === me.id;
     return (
       <div className="ctx-user">
-        <div className="ctx-profile">
-          <div className="ctx-banner" style={{ background: u.color }} />
-          <Avatar user={u} size={64} />
-          <strong>{u.username}</strong>
-          {u.status && <small>{u.status}</small>}
-          <TagPills user={u} server={server} />
-        </div>
+        <ProfileCard user={u} server={server} presence={presence[u.id] || 'offline'} size={72} />
+        <div className="ctx-after">
         {server && server.owner_id === me.id && (
           <>
             <div className="ctx-sep" />
@@ -444,6 +416,7 @@ function CtxContent({ ctx, me, server, close, setModal }) {
             </label>
           </>
         )}
+        </div>
       </div>
     );
   }

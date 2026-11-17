@@ -56,7 +56,11 @@ function checkPass(p, stored) {
   return crypto.timingSafeEqual(test, Buffer.from(h, 'hex'));
 }
 
-const publicUser = (u) => u && { id: u.id, username: u.username, color: u.color, avatar: u.avatar, status: u.status };
+const publicUser = (u) => u && { id: u.id, username: u.username, color: u.color, avatar: u.avatar, status: u.status, theme: u.theme || 'none', fx: u.fx || 'none' };
+// Profile looks: animated card background theme + animated effect around the avatar.
+for (const col of ["theme TEXT DEFAULT 'none'", "fx TEXT DEFAULT 'none'"]) { try { db.exec('ALTER TABLE users ADD COLUMN ' + col); } catch { /* exists */ } }
+const THEMES = ['none', 'surf', 'student', 'gamer', 'space', 'sakura', 'lava', 'slime', 'aurora'];
+const AVATAR_FX = ['none', 'rainbow', 'fire', 'sparkles', 'orbit', 'pulse', 'hearts'];
 
 function createServer(name, ownerId) {
   const r = db.prepare('INSERT INTO servers (name, owner_id, invite, color) VALUES (?,?,?,?)').run(name, ownerId, randCode(), pick(COLORS));
@@ -208,11 +212,13 @@ app.post('/api/logout', auth, (req, res) => {
 app.get('/api/bootstrap', auth, (req, res) => res.json(bootstrap(req.uid)));
 
 app.patch('/api/me', auth, (req, res) => {
-  const { status, color, presence } = req.body || {};
+  const { status, color, presence, theme, fx } = req.body || {};
+  if (THEMES.includes(theme)) db.prepare('UPDATE users SET theme=? WHERE id=?').run(theme, req.uid);
+  if (AVATAR_FX.includes(fx)) db.prepare('UPDATE users SET fx=? WHERE id=?').run(fx, req.uid);
   if (PRESENCES.includes(presence)) {
     db.prepare('UPDATE users SET presence=? WHERE id=?').run(presence, req.uid);
     broadcastRelated(req.uid, presenceMsg(req.uid));
-    if (status === undefined && color === undefined) return res.json({ ok: true });
+    if (status === undefined && color === undefined && theme === undefined && fx === undefined) return res.json({ ok: true });
   }
   if (typeof status === 'string') db.prepare('UPDATE users SET status=? WHERE id=?').run(status.slice(0, 80), req.uid);
   if (typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color)) db.prepare('UPDATE users SET color=? WHERE id=?').run(color, req.uid);
@@ -453,7 +459,8 @@ app.post('/api/servers/:id/sounds', auth, upload.single('file'), (req, res) => {
   if (req.file.size > 5 * 1024 * 1024) return fail(res, 400, 'Sound too large (max 5MB)');
   const name = String(req.body?.name || req.file.originalname.replace(/\.[^.]+$/, '')).slice(0, 32);
   const emoji = String(req.body?.emoji || '🔊').slice(0, 8);
-  db.prepare('INSERT INTO sounds (server_id, name, emoji, file, user_id) VALUES (?,?,?,?,?)').run(sid, name, emoji, '/uploads/' + req.file.filename, req.uid);
+  const volume = Math.max(0.05, Math.min(1, Number(req.body?.volume) || 1));
+  db.prepare('INSERT INTO sounds (server_id, name, emoji, file, volume, user_id) VALUES (?,?,?,?,?,?)').run(sid, name, emoji, '/uploads/' + req.file.filename, volume, req.uid);
   broadcastServer(sid, { t: 'refresh' });
   res.json({ ok: true });
 });

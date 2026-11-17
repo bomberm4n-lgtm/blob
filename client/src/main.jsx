@@ -5,6 +5,7 @@ import App from './App';
 import Auth from './Auth';
 import Intro from './Intro';
 import './styles.css';
+import './profile.css';
 
 function Root() {
   const [authed, setAuthed] = useState(!!getToken());

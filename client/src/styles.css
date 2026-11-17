@@ -56,11 +56,9 @@ input[type=color] { width: 60px; height: 36px; border: 0; background: none; padd
 
 /* Tooltip */
 .tt { position: relative; display: inline-flex; }
-.tt::after { content: attr(data-tip); position: absolute; background: #0b0c0e; color: var(--text); padding: 6px 10px; border-radius: 6px; font-size: 14px; font-weight: 600; white-space: nowrap; pointer-events: none; opacity: 0; transform: scale(.95); transition: opacity .1s, transform .1s; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,.4); text-transform: none; letter-spacing: normal; }
-.tt:hover::after { opacity: 1; transform: scale(1); }
-.tt-top::after { bottom: calc(100% + 8px); left: 50%; translate: -50% 0; }
-.tt-bottom::after { top: calc(100% + 8px); left: 50%; translate: -50% 0; }
-.tt-right::after { left: calc(100% + 14px); top: 50%; translate: 0 -50%; }
+.tt-pop { position: fixed; z-index: 3000; background: #0b0c0e; color: var(--text); padding: 6px 10px; border-radius: 6px; font-size: 14px; font-weight: 600; white-space: nowrap;
+  pointer-events: none; opacity: 0; transform: scale(.95); transition: opacity .1s, transform .1s; box-shadow: 0 4px 12px rgba(0,0,0,.4); text-transform: none; letter-spacing: normal; }
+.tt-pop.show { opacity: 1; transform: scale(1); }
 
 /* Avatar */
 .avatar { position: relative; border-radius: 50%; }
@@ -323,7 +321,8 @@ input[type=color] { width: 60px; height: 36px; border: 0; background: none; padd
 .chip { background: var(--bg-1); padding: 6px 12px; border-radius: 16px; font-size: 14px; font-weight: 600; color: var(--text-2); }
 .chip:hover { color: var(--text); }
 .chip.on { background: var(--accent); color: var(--accent-text); }
-.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.grid2 > *, .grid2 select { min-width: 0; max-width: 100%; }
 
 /* Soundboard */
 .soundboard-pop { position: fixed; left: 320px; bottom: 120px; z-index: 600; width: 420px; max-height: 520px; display: flex; flex-direction: column; background: var(--bg-1); border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,.6); animation: pop .15s; }
@@ -359,10 +358,10 @@ input[type=color] { width: 60px; height: 36px; border: 0; background: none; padd
 .snav.danger { color: var(--red); }
 .snav-sep { height: 1px; background: var(--bg-3); margin: 8px 10px; }
 .settings-content { flex: 1 1 800px; display: flex; overflow-y: auto; position: relative; }
-.settings-inner { width: 740px; max-width: 100%; padding: 60px 40px 80px; display: flex; flex-direction: column; gap: 16px; }
+.settings-inner { width: 740px; max-width: 100%; min-width: 0; box-sizing: border-box; padding: 60px 40px 80px; display: flex; flex-direction: column; gap: 16px; }
 .settings-inner h2 { margin: 0 0 8px; font-size: 20px; }
 .settings-inner h3 { margin: 0; font-size: 14px; text-transform: uppercase; color: var(--text-2); }
-.settings-close { position: sticky; top: 60px; height: 60px; display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--text-2); margin-left: 8px; font-size: 13px; font-weight: 600; }
+.settings-close { position: sticky; top: 60px; flex: none; background: none; border: 0; cursor: pointer; padding: 0; height: 60px; display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--text-2); margin-left: 8px; font-size: 13px; font-weight: 600; }
 .settings-close svg { border: 2px solid var(--text-3); border-radius: 50%; padding: 4px; width: 36px; height: 36px; }
 .settings-close:hover svg { background: var(--bg-hover); }
 .divider { height: 1px; background: var(--bg-4); margin: 8px 0; }
@@ -511,3 +510,34 @@ kbd { background: var(--bg-0); padding: 4px 10px; border-radius: 6px; font-famil
 .color-dot { width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
 .color-dot.sel { border-color: #fff; box-shadow: 0 0 0 2px var(--bg-0); }
 .color-picker input[type=color] { width: 28px; height: 28px; padding: 0; border: 0; background: none; cursor: pointer; }
+
+/* ---------- Add sound dialog ---------- */
+.sound-modal { width: 620px; max-width: 94vw; }
+.sound-drop { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 34px 16px; border: 2px dashed var(--bg-hover); border-radius: 10px; cursor: pointer; color: var(--text-2); text-align: center; text-transform: none; }
+.sound-drop:hover, .sound-drop.over { border-color: var(--accent); color: var(--text); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.sound-drop b { color: var(--text); font-size: 15px; }
+.sound-file { display: flex; align-items: center; gap: 10px; }
+.sound-file-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.sound-file .btn { margin: 0; }
+.wave { position: relative; height: 96px; border-radius: 8px; background: var(--bg-0); overflow: hidden; cursor: pointer; user-select: none; }
+.wave canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.wave-sel { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--accent) 16%, transparent); border-top: 2px solid var(--accent); border-bottom: 2px solid var(--accent); cursor: grab; }
+.wave-sel:active { cursor: grabbing; }
+.wave-handle { position: absolute; top: -2px; bottom: -2px; width: 10px; background: var(--accent); cursor: ew-resize; }
+.wave-handle.left { left: -5px; border-radius: 4px 0 0 4px; }
+.wave-handle.right { right: -5px; border-radius: 0 4px 4px 0; }
+.wave-handle::after { content: ''; position: absolute; left: 4px; top: 50%; width: 2px; height: 18px; margin-top: -9px; background: rgba(0, 0, 0, .45); border-radius: 1px; }
+.wave-playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 6px #fff; pointer-events: none; }
+.sound-times { display: flex; align-items: center; gap: 14px; font-variant-numeric: tabular-nums; color: var(--text-2); font-size: 14px; }
+.sound-times .btn { margin: 0; min-width: 96px; }
+.sound-len { margin-left: auto; font-weight: 600; }
+.sound-len.max { color: var(--yellow); }
+.sound-meta { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 16px; }
+.sound-emoji-pick { display: flex; flex-direction: column; gap: 10px; }
+.emoji-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+.emoji-cell { font-size: 20px; padding: 4px 0; border-radius: 6px; border: 2px solid transparent; background: var(--bg-0); cursor: pointer; }
+.emoji-cell:hover { background: var(--bg-hover); }
+.emoji-cell.sel { border-color: var(--accent); }
+.sound-emoji-pick .emoji-input { width: 64px; text-align: center; font-size: 18px; }
+.sound-fields { display: flex; flex-direction: column; gap: 14px; }
+.sound-preview-btn { pointer-events: none; align-self: flex-start; min-width: 140px; }

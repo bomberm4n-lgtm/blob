@@ -1,4 +1,5 @@
-import { useEffect, useRef, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useSyncExternalStore, useLayoutEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { voice } from './voice';
 
 export const useVoice = () => {
@@ -80,25 +81,68 @@ export function Modal({ title, onClose, children, wide, className }) {
   );
 }
 
+// Tooltip rendered on <body> with fixed positioning, so panels with overflow:hidden can never cut it off.
 export function Tooltip({ text, children, side = 'top' }) {
+  const ref = useRef();
+  const tipRef = useRef();
+  const [rect, setRect] = useState(null);
+  const [pos, setPos] = useState(null);
+  useLayoutEffect(() => {
+    if (!rect || !tipRef.current) return setPos(null);
+    const t = tipRef.current.getBoundingClientRect();
+    const gap = side === 'right' ? 14 : 8;
+    let left;
+    let top;
+    if (side === 'right') { left = rect.right + gap; top = rect.top + rect.height / 2 - t.height / 2; }
+    else if (side === 'bottom') { left = rect.left + rect.width / 2 - t.width / 2; top = rect.bottom + gap; }
+    else { left = rect.left + rect.width / 2 - t.width / 2; top = rect.top - t.height - gap; if (top < 4) top = rect.bottom + gap; }
+    left = Math.max(6, Math.min(left, window.innerWidth - t.width - 6));
+    top = Math.max(6, Math.min(top, window.innerHeight - t.height - 6));
+    setPos({ left, top });
+  }, [rect, side, text]);
+  if (!text) return children;
   return (
-    <span className={'tt tt-' + side} data-tip={text}>
+    <span className="tt" ref={ref}
+      onMouseEnter={() => setRect(ref.current.getBoundingClientRect())}
+      onMouseLeave={() => setRect(null)} onMouseDown={() => setRect(null)}>
       {children}
+      {rect && createPortal(
+        <div ref={tipRef} className={'tt-pop' + (pos ? ' show' : '')} style={pos || { left: -9999, top: -9999 }}>{text}</div>,
+        document.body,
+      )}
     </span>
   );
 }
 
 // Context menu (right click).
-export function ContextMenu({ x, y, onClose, children }) {
+export function ContextMenu({ x, y, onClose, children, className = '' }) {
   const ref = useRef();
   useEffect(() => {
     const h = (e) => !ref.current?.contains(e.target) && onClose();
     setTimeout(() => window.addEventListener('mousedown', h));
     return () => window.removeEventListener('mousedown', h);
   }, [onClose]);
-  const style = { left: Math.min(x, window.innerWidth - 240), top: Math.min(y, window.innerHeight - 320) };
+  // Measure the real menu size and keep it fully inside the window (re-checks when its content grows).
+  const [pos, setPos] = useState({ left: x, top: y, visibility: 'hidden' });
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const place = () => {
+      const m = 8;
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      const left = x + w + m > window.innerWidth ? Math.max(m, x - w) : x;
+      const top = Math.max(m, Math.min(y, window.innerHeight - h - m));
+      setPos({ left, top });
+    };
+    place();
+    const ro = new ResizeObserver(place);
+    ro.observe(el);
+    window.addEventListener('resize', place);
+    return () => { ro.disconnect(); window.removeEventListener('resize', place); };
+  }, [x, y]);
   return (
-    <div ref={ref} className="ctx-menu" style={style}>
+    <div ref={ref} className={'ctx-menu ' + className} style={pos}>
       {children}
     </div>
   );
