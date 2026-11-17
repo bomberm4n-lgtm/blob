@@ -413,27 +413,27 @@ kbd { background: var(--bg-0); padding: 4px 10px; border-radius: 6px; font-famil
 .update-banner { background: var(--accent); display: flex; align-items: center; justify-content: center; gap: 10px; }
 .update-banner .btn { margin: 0; }
 
-/* ---------- Intro (3s) ---------- */
+/* ---------- Intro (6s) ---------- */
 .intro { position: fixed; inset: 0; z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
   background: radial-gradient(circle at 50% 45%, #10283a 0%, #0b1620 55%, #070c12 100%); overflow: hidden; cursor: pointer;
-  transition: opacity .6s ease, transform .6s ease, filter .6s ease; }
+  transition: opacity .9s ease, transform .9s ease, filter .9s ease; }
 .intro.intro-leave { opacity: 0; transform: scale(1.06); filter: blur(6px); pointer-events: none; }
 .intro-glow { position: absolute; width: 520px; height: 520px; border-radius: 50%; background: radial-gradient(circle, rgba(142, 216, 245, .28), transparent 65%);
-  animation: intro-glow 3s ease-out both; }
+  animation: intro-glow 6s ease-out both; }
 .intro-stage { position: relative; width: 160px; height: 170px; display: flex; align-items: flex-end; justify-content: center; }
 .intro-slime { width: 160px; height: 160px; image-rendering: pixelated; transform-origin: 50% 100%; position: relative; z-index: 1;
-  filter: drop-shadow(0 0 18px rgba(142, 216, 245, .45)); animation: intro-drop 1.25s cubic-bezier(.3, .0, .3, 1) both, intro-idle 1.2s ease-in-out 1.25s infinite; }
-.intro-shadow { position: absolute; bottom: 4px; width: 120px; height: 14px; border-radius: 50%; background: rgba(0, 0, 0, .45); animation: intro-shadow 1.25s cubic-bezier(.3, 0, .3, 1) both; }
+  filter: drop-shadow(0 0 18px rgba(142, 216, 245, .45)); animation: intro-drop 1.8s cubic-bezier(.3, .0, .3, 1) .3s both, intro-idle 1.4s ease-in-out 2.1s infinite; }
+.intro-shadow { position: absolute; bottom: 4px; width: 120px; height: 14px; border-radius: 50%; background: rgba(0, 0, 0, .45); animation: intro-shadow 1.8s cubic-bezier(.3, 0, .3, 1) .3s both; }
 .intro-title { margin: 14px 0 0; font-size: 64px; font-weight: 900; letter-spacing: 6px; color: #e6f8ff; display: flex;
   text-shadow: 0 0 24px rgba(142, 216, 245, .55), 0 4px 0 #1b4a5e; }
-.intro-title span { display: inline-block; opacity: 0; animation: intro-letter .5s cubic-bezier(.2, 1.6, .4, 1) both; animation-delay: calc(1.05s + var(--i) * .09s); }
+.intro-title span { display: inline-block; opacity: 0; animation: intro-letter .7s cubic-bezier(.2, 1.6, .4, 1) both; animation-delay: calc(1.9s + var(--i) * .18s); }
 .intro-tag { margin: 0; color: #8ed8f5; opacity: 0; letter-spacing: 3px; text-transform: uppercase; font-size: 12px; font-weight: 600;
-  animation: intro-fade .6s ease 1.6s both; }
-.intro-bar { width: 180px; height: 4px; border-radius: 4px; background: rgba(142, 216, 245, .15); margin-top: 22px; overflow: hidden; opacity: 0; animation: intro-fade .4s ease .3s both; }
-.intro-bar div { height: 100%; width: 100%; background: linear-gradient(90deg, #5cb6df, #e6f8ff); transform-origin: left; animation: intro-load 2.3s ease-in-out .3s both; }
+  animation: intro-fade .9s ease 2.9s both; }
+.intro-bar { width: 180px; height: 4px; border-radius: 4px; background: rgba(142, 216, 245, .15); margin-top: 22px; overflow: hidden; opacity: 0; animation: intro-fade .5s ease .5s both; }
+.intro-bar div { height: 100%; width: 100%; background: linear-gradient(90deg, #5cb6df, #e6f8ff); transform-origin: left; animation: intro-load 4.4s ease-in-out .6s both; }
 .intro-pixels i { position: absolute; width: 6px; height: 6px; background: #8ed8f5; opacity: 0;
   left: calc(8% + var(--i) * 5%); top: calc(20% + mod(var(--i) * 37, 60) * 1%);
-  animation: intro-pixel 2.2s ease-out both; animation-delay: calc(.9s + var(--i) * .04s); }
+  animation: intro-pixel 3.2s ease-out both; animation-delay: calc(1.7s + var(--i) * .07s); }
 .intro-pixels i:nth-child(3n) { background: #e6f8ff; width: 4px; height: 4px; }
 .intro-pixels i:nth-child(4n) { background: #5cb6df; }
 

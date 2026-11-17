@@ -1,12 +1,12 @@
-// 3-second opening animation: the slime drops in and bounces, the name pops in letter by letter, then it all fades out.
+// 6-second opening animation: the slime drops in and bounces, the name pops in letter by letter, then it all fades out.
 import { useEffect, useState } from 'react';
 
-export const INTRO_MS = 3000;
+export const INTRO_MS = 6000;
 
 export default function Intro({ onDone }) {
   const [leaving, setLeaving] = useState(false);
   useEffect(() => {
-    const fade = setTimeout(() => setLeaving(true), INTRO_MS - 600);
+    const fade = setTimeout(() => setLeaving(true), INTRO_MS - 900);
     const done = setTimeout(onDone, INTRO_MS);
     return () => { clearTimeout(fade); clearTimeout(done); };
   }, [onDone]);
