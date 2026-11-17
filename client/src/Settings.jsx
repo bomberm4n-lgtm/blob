@@ -150,7 +150,7 @@ function VoiceTab() {
       .catch(() => setTesting(false));
     return () => { alive = false; handle?.stop(); testRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [testing, hearMe, s.inputDevice, s.noise, s.echo, s.agc, s.gateEnabled, gateDbSettled, s.dfAtten, s.outputDevice]);
+  }, [testing, hearMe, s.inputDevice, s.noise, s.echo, s.agc, s.gateEnabled, gateDbSettled, s.dfAtten, s.voiceOnly, s.outputDevice]);
 
   const set = (patch, restart = true) => {
     voice.saveSettings(patch);
@@ -226,6 +226,7 @@ function VoiceTab() {
           onChange={(x) => set({ gateEnabled: x })} />
       </div>
       {s.noise === 'deepfilter' && <small className="muted">The noise gate is off with Blob AI Pro: the AI already removes the noise, and the gate on top of it chops your words.</small>}
+      <Toggle label="Only send my voice (cuts sniffs, breathing, wind)" checked={s.voiceOnly !== false} onChange={(x) => set({ voiceOnly: x })} />
       <Toggle label="Automatic voice detection (recommended)" checked={s.vadAuto !== false} onChange={(x) => voice.saveSettings({ vadAuto: x })} />
       {s.vadAuto === false && <Slider label="Voice detection threshold" value={s.gateDb} min={-100} max={0} suffix=" dB" onChange={(x) => voice.saveSettings({ gateDb: Math.round(x) })} />}
       <small className="muted">

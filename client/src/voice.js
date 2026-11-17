@@ -11,6 +11,7 @@ const defaults = {
   echo: true, agc: true,
   gateEnabled: false, gateDb: -50,
   vadAuto: true, // automatic voice detection (noise-floor based)
+  voiceOnly: true, // only transmit voice-like sound (cuts sniffs, breathing, wind)
   inputGain: 1,
   userVolumes: {}, // userId -> 0..2
   userMuted: {}, // userId -> bool (muted just for me)
@@ -239,7 +240,7 @@ class VoiceManager {
       noiseSuppression: s.noise === 'browser',
       channelCount: 1,
     });
-    if (s.noise === 'rnnoise' || s.noise === 'deepfilter' || s.gateEnabled || s.inputGain !== 1) {
+    if (s.noise === 'rnnoise' || s.noise === 'deepfilter' || s.gateEnabled || s.inputGain !== 1 || s.voiceOnly !== false) {
       try {
         this.micProcessor = new BlobMicProcessor(s);
         await track.setProcessor(this.micProcessor);

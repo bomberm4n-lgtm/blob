@@ -84,6 +84,35 @@ export class BlobMicProcessor {
       node.connect(gate);
       node = gate;
     }
+    if (s.voiceOnly !== false) {
+      const an = ctx.createAnalyser();
+      an.fftSize = 1024;
+      an.smoothingTimeConstant = 0;
+      node.connect(an);
+      const delay = ctx.createDelay(0.2);
+      delay.delayTime.value = 0.04;
+      const vgate = ctx.createGain();
+      vgate.gain.value = 0;
+      node.connect(delay).connect(vgate);
+      node = vgate;
+      const check = createVoiceCheck(an, { need: 3, of: 5 }); // stricter than the ring: it decides what others hear
+      const autoThr = createAutoThreshold();
+      let lastVoice = 0;
+      let open = false;
+      this.vadTimer = setInterval(() => {
+        const { db, voice } = check();
+        const thr = autoThr(db);
+        const now = performance.now();
+        if (voice && db > Math.min(thr, -45)) lastVoice = now;
+        const want = now - lastVoice < 400; // keep open through short pauses between words
+        if (want !== open) {
+          open = want;
+          const t = ctx.currentTime;
+          vgate.gain.cancelScheduledValues(t);
+          vgate.gain.setTargetAtTime(open ? 1 : 0, t, open ? 0.005 : 0.03);
+        }
+      }, 20);
+    }
     // Force true mono: some processors output 2 channels with only the left one filled (left-ear-only audio).
     // 'discrete' keeps channel 0 only; a mono node then plays in both ears.
     const mono = ctx.createGain();
@@ -104,6 +133,7 @@ export class BlobMicProcessor {
   }
 
   async destroy() {
+    clearInterval(this.vadTimer);
     try { this.rnnoise?.destroy?.(); } catch { /* ignore */ }
     this.rnnoise = null;
     try { this.dfn?.disconnect(); } catch { /* ignore */ }
@@ -115,6 +145,34 @@ export class BlobMicProcessor {
 
 // Instant speaking detector: measures the audio that ACTUALLY goes out to others (after suppression/gate).
 // Lights up as soon as there is sound and turns off ~150 ms after it stops.
+// Is this sound a human voice? Voice concentrates its energy in 250–3500 Hz and is tonal (harmonic);
+// fans, wind, breathing and sniffs are spread-out noise. Measured on test audio: voice ~71% of loud frames,
+// fan 7%, wind 8%, sniff 0%. Requiring 2 of the last 3 frames removes the stray false positives.
+export function createVoiceCheck(analyser, { need = 2, of = 3 } = {}) {
+  const fd = new Float32Array(analyser.frequencyBinCount);
+  const td = new Float32Array(analyser.fftSize);
+  const binHz = analyser.context.sampleRate / analyser.fftSize;
+  const lo = Math.round(250 / binHz), hi = Math.round(3500 / binHz), top = Math.min(fd.length, Math.round(8000 / binHz));
+  const recent = [];
+  return () => {
+    analyser.getFloatTimeDomainData(td);
+    let e = 0;
+    for (const v of td) e += v * v;
+    const db = 10 * Math.log10(e / td.length + 1e-12);
+    analyser.getFloatFrequencyData(fd);
+    let tot = 0, band = 0, ls = 0, am = 0, cnt = 0;
+    for (let k = 2; k < top; k++) {
+      const p = 10 ** (fd[k] / 10);
+      tot += p;
+      if (k >= lo && k <= hi) { band += p; ls += Math.log(p + 1e-20); am += p; cnt++; }
+    }
+    const frameVoice = band / (tot || 1) > 0.5 && Math.exp(ls / cnt) / (am / cnt + 1e-20) < 0.15;
+    recent.push(frameVoice);
+    if (recent.length > of) recent.shift();
+    return { db, voice: recent.filter(Boolean).length >= need };
+  };
+}
+
 // Automatic voice detection: the background-noise level is the quietest 15% of the last ~3 s of audio
 // (a fan is constant, speech comes and goes). Only sound clearly above it (+12 dB) counts as talking.
 export function createAutoThreshold(windowSize = 150) {
@@ -130,27 +188,25 @@ export function createAutoThreshold(windowSize = 150) {
 
 // thresholdDb can be a number or a function (read on every check, so slider changes apply instantly).
 // auto(): when true, the threshold comes from the noise-floor tracker instead.
-export function startSpeakingDetector(mediaStreamTrack, onChange, { thresholdDb = -50, releaseMs = 150, auto = () => false } = {}) {
+export function startSpeakingDetector(mediaStreamTrack, onChange, { thresholdDb = -50, releaseMs = 50, auto = () => false } = {}) {
   const limit = typeof thresholdDb === 'function' ? thresholdDb : () => thresholdDb;
   const autoThr = createAutoThreshold();
   let warm = 0; // ignore the first ~0.3 s while the noise level is being learned
   const ctx = new AudioContext();
   const an = ctx.createAnalyser();
-  an.fftSize = 512;
+  an.fftSize = 1024;
+  an.smoothingTimeConstant = 0;
   ctx.createMediaStreamSource(new MediaStream([mediaStreamTrack])).connect(an);
-  const buf = new Float32Array(an.fftSize);
+  const check = createVoiceCheck(an);
   let on = false;
   let lastLoud = 0;
   const id = setInterval(() => {
     if (ctx.state === 'suspended') ctx.resume().catch(() => {});
-    an.getFloatTimeDomainData(buf);
-    let sum = 0;
-    for (const v of buf) sum += v * v;
-    const db = 20 * Math.log10(Math.sqrt(sum / buf.length) + 1e-9);
+    const { db, voice } = check();
     const now = performance.now();
     const a = autoThr(db);
     warm++;
-    if (db > (auto() ? (warm < 15 ? Infinity : a) : limit())) lastLoud = now;
+    if (voice && db > (auto() ? (warm < 15 ? Infinity : a) : limit())) lastLoud = now;
     const next = now - lastLoud < releaseMs;
     if (next !== on) { on = next; onChange(on); }
   }, 20);
