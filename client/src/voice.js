@@ -51,6 +51,7 @@ class VoiceManager {
   spk = new Map(); // identity -> expires at (ms) — instant detection sent by each client
   spkCapable = new Set(); // clients that send instant detection
   localSpeaking = false;
+  inAway = false; // currently in the AWAY channel (forced mute + deafen)
   joinedAt = null; // when this call started (for the call timer)
   lastActivity = Date.now(); // last time we talked or touched the app (for the AWAY channel)
   watching = new Set(); // userIds whose screens I'm watching
@@ -91,8 +92,13 @@ class VoiceManager {
     });
   }
 
-  async join(channelId, serverId) {
+  // isAway: the AWAY channel — you're fully muted AND deafened there; going back to any other channel restores both.
+  async join(channelId, serverId, isAway = false) {
     if (this.channelId === channelId && this.room) return;
+    const wasAway = this.inAway;
+    this.inAway = isAway;
+    if (isAway) { this.muted = true; this.deafened = true; }
+    else if (wasAway) { this.muted = false; this.deafened = false; }
     // Switching rooms: play a "leaving" swoop now; the join chime plays once the new room connects.
     if (this.channelId && this.channelId !== channelId) this.playUiSound('switch');
     await this.leave(true);
@@ -126,6 +132,7 @@ class VoiceManager {
       }
       this.status = 'connected';
       this.joinedAt = Date.now();
+      if (isAway || wasAway) await this.setDeafened(this.deafened, true);
       this.lastActivity = Date.now();
       this.playUiSound('join');
       this.pushState();
@@ -293,6 +300,7 @@ class VoiceManager {
   }
 
   async setMuted(m) {
+    if (!m && this.inAway) return; // stays muted while in AWAY
     this.muted = m;
     this.lastActivity = Date.now();
     if (!m && this.deafened) this.setDeafened(false, true);
@@ -307,6 +315,7 @@ class VoiceManager {
   }
 
   async setDeafened(d, silent) {
+    if (!d && this.inAway) return; // can't undeafen while in AWAY (leave the channel to come back)
     this.deafened = d;
     for (const p of this.room?.remoteParticipants.values() || []) this.applyVolume(p);
     const t = this.micTrack();

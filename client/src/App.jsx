@@ -116,7 +116,7 @@ export default function App() {
       const srv = servers.find((s) => s.id === voice.serverId);
       const away = srv?.channels.find((c) => c.afk);
       if (!away || away.id === voice.channelId) return;
-      voice.join(away.id, srv.id).then(() => voice.setMuted(true)).catch(() => {});
+      voice.join(away.id, srv.id, true).catch(() => {});
     }, 15000);
     return () => clearInterval(id);
   }, [servers]);
@@ -131,7 +131,7 @@ export default function App() {
   };
 
   const joinVoice = (c) => {
-    if (v.channelId !== c.id) voice.join(c.id, server.id);
+    if (v.channelId !== c.id) voice.join(c.id, server.id, !!c.afk);
     selectChannel(c);
   };
 
