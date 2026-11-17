@@ -459,9 +459,22 @@ app.post('/api/servers/:id/sounds', auth, upload.single('file'), (req, res) => {
   if (req.file.size > 5 * 1024 * 1024) return fail(res, 400, 'Sound too large (max 5MB)');
   const name = String(req.body?.name || req.file.originalname.replace(/\.[^.]+$/, '')).slice(0, 32);
   const emoji = String(req.body?.emoji || '🔊').slice(0, 8);
-  const volume = Math.max(0.05, Math.min(1, Number(req.body?.volume) || 1));
+  const volume = Math.max(0.05, Math.min(2, Number(req.body?.volume) || 1));
   db.prepare('INSERT INTO sounds (server_id, name, emoji, file, volume, user_id) VALUES (?,?,?,?,?,?)').run(sid, name, emoji, '/uploads/' + req.file.filename, volume, req.uid);
   broadcastServer(sid, { t: 'refresh' });
+  res.json({ ok: true });
+});
+
+// Edit a sound's name, emoji or volume (any member of the server can, like adding/deleting).
+app.patch('/api/sounds/:id', auth, (req, res) => {
+  const s = db.prepare('SELECT * FROM sounds WHERE id=?').get(req.params.id);
+  if (!s || !isMember(s.server_id, req.uid)) return fail(res, 403, 'No access');
+  const name = req.body?.name !== undefined ? String(req.body.name).trim().slice(0, 32) : s.name;
+  const emoji = req.body?.emoji !== undefined ? String(req.body.emoji).slice(0, 8) || '🔊' : s.emoji;
+  const volume = req.body?.volume !== undefined ? Math.max(0.05, Math.min(2, Number(req.body.volume) || 1)) : s.volume;
+  if (!name) return fail(res, 400, 'Name is empty');
+  db.prepare('UPDATE sounds SET name=?, emoji=?, volume=? WHERE id=?').run(name, emoji, volume, s.id);
+  broadcastServer(s.server_id, { t: 'refresh' });
   res.json({ ok: true });
 });
 

@@ -339,7 +339,11 @@ input[type=color] { width: 60px; height: 36px; border: 0; background: none; padd
 .sb-emoji { font-size: 18px; }
 .sb-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sb-del { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; background: var(--red); color: #fff; display: none; align-items: center; justify-content: center; }
-.sb-btn:hover .sb-del { display: flex; }
+.sb-btn:hover .sb-del, .sb-btn:hover .sb-edit { display: flex; }
+.sb-edit { position: absolute; top: -6px; right: 16px; width: 18px; height: 18px; border-radius: 50%; background: var(--bg-active, #404249); color: #fff; display: none; align-items: center; justify-content: center; }
+.sb-edit:hover { background: var(--accent); color: var(--accent-text); }
+.btn.danger-text { color: var(--red); background: transparent; }
+.btn.danger-text:hover { background: color-mix(in srgb, var(--red) 15%, transparent); }
 .sb-add { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-top: 1px solid var(--bg-0); }
 .sb-add .btn { text-transform: none; font-size: 14px; color: var(--text); letter-spacing: normal; cursor: pointer; }
 .sb-add-row { display: flex; gap: 8px; }

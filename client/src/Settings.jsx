@@ -3,7 +3,7 @@ import { api } from './api';
 import { voice, SHARE_RESOLUTIONS } from './voice';
 import { startMicMeter } from './noise';
 import { Avatar, Icon, Modal, Slider, useVoice } from './ui';
-import { AddSoundModal } from './SoundEditor';
+import { AddSoundModal, EditSoundModal } from './SoundEditor';
 
 function useDevices() {
   const [devices, setDevices] = useState([]);
@@ -376,6 +376,7 @@ export function ShareModal({ onClose }) {
 export function Soundboard({ server, onClose }) {
   const v = useVoice();
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState(null);
   const [filter, setFilter] = useState('');
   const sounds = (server?.sounds || []).filter((s) => s.name.toLowerCase().includes(filter.toLowerCase()));
 
@@ -396,6 +397,9 @@ export function Soundboard({ server, onClose }) {
             onContextMenu={(e) => { e.preventDefault(); voice.playSoundLocal(s.file, s.volume); }}>
             <span className="sb-emoji">{s.emoji}</span>
             <span className="sb-name">{s.name}</span>
+            <span className="sb-edit" title="Edit sound" onClick={(e) => { e.stopPropagation(); setEditing(s); }}>
+              <Icon name="edit" size={12} />
+            </span>
             <span className="sb-del" title="Delete sound" onClick={(e) => { e.stopPropagation(); if (confirm(`Delete the sound "${s.name}"?`)) api('/api/sounds/' + s.id, { method: 'DELETE' }); }}>
               <Icon name="close" size={12} />
             </span>
@@ -404,6 +408,7 @@ export function Soundboard({ server, onClose }) {
         <button className="sb-btn add" onClick={() => setAdding(true)}><Icon name="plus" /> <span className="sb-name">Add sound</span></button>
       </div>
       {adding && <AddSoundModal server={server} onClose={() => setAdding(false)} />}
+      {editing && <EditSoundModal sound={editing} onClose={() => setEditing(null)} />}
     </div>
   );
 }

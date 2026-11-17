@@ -2,10 +2,11 @@
 // preview it, pick an emoji, name and volume, then upload the trimmed clip as a WAV.
 import { useEffect, useRef, useState } from 'react';
 import { api } from './api';
+import { voice } from './voice';
 import { Icon, Modal, Slider } from './ui';
 
 export const MAX_SOUND_SECONDS = 5;
-const EMOJIS = ['🔊', '😂', '💀', '🤣', '😭', '🔥', '💩', '👏', '🎉', '😡', '😱', '🤡', '👀', '🗿', '🐐', '🐒', '🦆', '🐸', '🍆', '💥', '📢', '🎺', '🥁', '🎸', '🚨', '⚡', '❤️', '👑', '🤬', '😴', '🙏', '🤓'];
+export const EMOJIS = ['🔊', '😂', '💀', '🤣', '😭', '🔥', '💩', '👏', '🎉', '😡', '😱', '🤡', '👀', '🗿', '🐐', '🐒', '🦆', '🐸', '🍆', '💥', '📢', '🎺', '🥁', '🎸', '🚨', '⚡', '❤️', '👑', '🤬', '😴', '🙏', '🤓'];
 
 const fmt = (s) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`;
 
@@ -154,7 +155,7 @@ export function AddSoundModal({ server, onClose }) {
     const src = ctx.createBufferSource();
     src.buffer = buffer;
     const g = ctx.createGain();
-    g.gain.value = volume / 100;
+    g.gain.value = (volume / 100) * (voice.settings.soundVolume ?? 0.6);
     src.connect(g).connect(ctx.destination);
     const [s, e] = sel;
     const t0 = ctx.currentTime;
@@ -223,7 +224,7 @@ export function AddSoundModal({ server, onClose }) {
           </div>
           <div className="sound-fields">
             <label>Sound name<input value={name} maxLength={32} placeholder="e.g. bonk" onChange={(e) => setName(e.target.value)} /></label>
-            <Slider label="Volume" value={volume} max={100} onChange={setVolume} />
+            <Slider label="Volume" value={volume} max={200} onChange={setVolume} />
             <div className="sb-btn sound-preview-btn"><span className="sb-emoji">{emoji}</span><span className="sb-name">{name || 'Sound name'}</span></div>
           </div>
         </div>
@@ -232,6 +233,56 @@ export function AddSoundModal({ server, onClose }) {
         <div className="modal-foot">
           <button className="btn" onClick={() => { stop(); onClose(); }}>Cancel</button>
           <button className="btn primary" disabled={!buffer || busy || !name.trim()} onClick={upload}>{busy ? 'Uploading…' : 'Upload'}</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// Edit an existing sound: name, emoji and volume (0–200%), with a preview at the chosen volume.
+export function EditSoundModal({ sound, onClose }) {
+  const [name, setName] = useState(sound.name);
+  const [emoji, setEmoji] = useState(sound.emoji || '🔊');
+  const [volume, setVolume] = useState(Math.round((sound.volume ?? 1) * 100));
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    setBusy(true);
+    setErr('');
+    try {
+      await api('/api/sounds/' + sound.id, { method: 'PATCH', body: { name: name.trim(), emoji, volume: volume / 100 } });
+      onClose();
+    } catch (e) { setErr(e.message); }
+    setBusy(false);
+  };
+  const remove = async () => {
+    if (!confirm(`Delete the sound "${sound.name}"?`)) return;
+    await api('/api/sounds/' + sound.id, { method: 'DELETE' }).catch((e) => alert(e.message));
+    onClose();
+  };
+  return (
+    <Modal title="Edit sound" onClose={onClose} className="sound-modal">
+      <div className="modal-body">
+        <div className="sound-meta">
+          <div className="sound-emoji-pick">
+            <div className="quality-label">Emoji</div>
+            <div className="emoji-grid">
+              {EMOJIS.map((e) => <button key={e} type="button" className={'emoji-cell' + (emoji === e ? ' sel' : '')} onClick={() => setEmoji(e)}>{e}</button>)}
+            </div>
+            <input className="emoji-input" value={emoji} maxLength={8} onChange={(e) => setEmoji(e.target.value)} title="Or type/paste any emoji" />
+          </div>
+          <div className="sound-fields">
+            <label>Sound name<input value={name} maxLength={32} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} /></label>
+            <Slider label="Volume" value={volume} max={200} onChange={setVolume} />
+            <button type="button" className="btn small sound-play" onClick={() => voice.playSoundLocal(sound.file, volume / 100)}>▶ Preview</button>
+            <div className="sb-btn sound-preview-btn"><span className="sb-emoji">{emoji}</span><span className="sb-name">{name || 'Sound name'}</span></div>
+          </div>
+        </div>
+        {err && <div className="form-error">{err}</div>}
+        <div className="modal-foot">
+          <button className="btn danger-text" onClick={remove} style={{ marginRight: 'auto' }}><Icon name="trash" size={16} /> Delete</button>
+          <button className="btn" onClick={onClose}>Cancel</button>
+          <button className="btn primary" disabled={busy || !name.trim()} onClick={save}>{busy ? 'Saving…' : 'Save'}</button>
         </div>
       </div>
     </Modal>

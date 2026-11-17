@@ -448,8 +448,20 @@ class VoiceManager {
     if (this.deafened) return;
     if (from && this.settings.userMuted[from]) return;
     const a = new Audio(url);
-    a.volume = Math.min(1, Math.max(0, this.settings.soundVolume * vol));
-    if (this.settings.outputDevice && a.setSinkId) a.setSinkId(this.settings.outputDevice).catch(() => {});
+    const level = Math.max(0, this.settings.soundVolume * vol);
+    if (level <= 1) {
+      a.volume = level;
+      if (this.settings.outputDevice && a.setSinkId) a.setSinkId(this.settings.outputDevice).catch(() => {});
+    } else {
+      // Above 100%: boost through Web Audio (an <audio> element can't go louder than 1.0).
+      a.crossOrigin = 'anonymous';
+      const ctx = (this.sbCtx ||= new AudioContext());
+      if (this.settings.outputDevice && ctx.setSinkId && ctx.sinkId !== this.settings.outputDevice) ctx.setSinkId(this.settings.outputDevice).catch(() => {});
+      ctx.resume().catch(() => {});
+      const gain = ctx.createGain();
+      gain.gain.value = level;
+      ctx.createMediaElementSource(a).connect(gain).connect(ctx.destination);
+    }
     this.sounds.add(a);
     a.onended = () => this.sounds.delete(a);
     a.play().catch(() => {});
