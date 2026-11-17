@@ -30,7 +30,7 @@ export const AVATAR_FX = {
 const range = (n) => Array.from({ length: n }, (_, i) => i);
 
 // Decorative animated layers for each theme (pure CSS animation, no images).
-function ThemeLayers({ theme }) {
+export function ThemeLayers({ theme }) {
   switch (theme) {
     case 'surf':
       return (<>

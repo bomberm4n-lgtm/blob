@@ -238,7 +238,10 @@ input[type=color] { width: 60px; height: 36px; border: 0; background: none; padd
 .tiles.n1 { grid-template-columns: 1fr; }
 .tiles.n2 { grid-template-columns: 1fr 1fr; }
 .tile { position: relative; aspect-ratio: 16 / 9; background: var(--bg-2); border-radius: 10px; overflow: hidden; cursor: pointer; transition: box-shadow .1s; max-height: 100%; }
-.user-tile { background: color-mix(in srgb, var(--tile-color) 35%, #1f2023); }
+.user-tile { background: #0b0b0d; isolation: isolate; }
+.tile-gradient { position: absolute; inset: 0; z-index: -1; background: linear-gradient(to bottom, #0b0b0d 0%, color-mix(in srgb, var(--tile-color) 45%, #0b0b0d) 55%, var(--tile-color) 100%); }
+.user-tile.pcard-themed .pcard-bg { z-index: -1; }
+.user-tile .tile-name { z-index: 1; }
 .tile.speaking { box-shadow: inset 0 0 0 3px var(--accent); }
 .tile video { width: 100%; height: 100%; object-fit: cover; display: block; background: #000; }
 .tile video.contain { object-fit: contain; }

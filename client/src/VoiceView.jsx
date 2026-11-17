@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Track } from 'livekit-client';
 import { voice } from './voice';
 import { Avatar, Icon, Slider, Tooltip, useVoice } from './ui';
+import { AvatarFx, ThemeLayers } from './Profile';
 
 function VideoEl({ track, mirror, contain, onStats }) {
   const ref = useRef();
@@ -88,11 +89,14 @@ function StreamTile({ p, user, isLocal, watching, focused, onFocus }) {
 function UserTile({ p, user, state, speaking, onMenu, focused, onFocus }) {
   const cam = p.getTrackPublication(Track.Source.Camera)?.track;
   const isLocal = p === voice.local;
+  const theme = user?.theme && user.theme !== 'none' ? user.theme : null;
   return (
-    <div className={'tile user-tile' + (speaking ? ' speaking' : '') + (focused ? ' focused' : '')} onClick={onFocus}
-      onContextMenu={(e) => { e.preventDefault(); onMenu(e, user); }} style={{ '--tile-color': user?.color }}>
+    <div className={'tile user-tile' + (theme ? ' pcard-themed th-' + theme : '') + (speaking ? ' speaking' : '') + (focused ? ' focused' : '')} onClick={onFocus}
+      onContextMenu={(e) => { e.preventDefault(); onMenu(e, user); }} style={{ '--tile-color': user?.color || '#5865f2', '--accent-user': user?.color }}>
+      {/* Same look as the profile card: animated theme, or a gradient from black to the profile color. */}
+      {!cam && (theme ? <div className="pcard-bg"><ThemeLayers theme={theme} /></div> : <div className="tile-gradient" />)}
       {cam ? <VideoEl track={cam} mirror={isLocal} /> : (
-        <div className="tile-center"><Avatar user={user} size={80} speaking={speaking} /></div>
+        <div className="tile-center"><AvatarFx fx={user?.fx} size={80}><Avatar user={user} size={80} speaking={speaking} /></AvatarFx></div>
       )}
       <div className="tile-name">
         {state?.deafened ? <Icon name="headOff" size={14} className="red" /> : state?.muted && <Icon name="micOff" size={14} className="red" />}
