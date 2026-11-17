@@ -289,7 +289,7 @@ CREATE TABLE IF NOT EXISTS tags (id INTEGER PRIMARY KEY, server_id INTEGER NOT N
 CREATE TABLE IF NOT EXISTS user_tags (tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, PRIMARY KEY (tag_id, user_id));
 `);
-const TAG_ICONS = ['poop', 'crown', 'muscle', 'gamepad', 'surf', 'bald', 'monkey', 'slime'];
+const TAG_ICONS = ['poop', 'crown', 'muscle', 'gamepad', 'surf', 'bald', 'monkey', 'commie', 'slime'];
 function cleanTag(body) {
   const name = String(body?.name || '').trim().slice(0, 24);
   const icon = TAG_ICONS.includes(body?.icon) ? body.icon : null;
