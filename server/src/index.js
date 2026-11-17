@@ -71,6 +71,7 @@ function createServer(name, ownerId) {
   ch.run(sid, 'memes', 'text', 1);
   ch.run(sid, 'Room 1', 'voice', 2);
   ch.run(sid, 'Room 2', 'voice', 3);
+  db.prepare("INSERT INTO channels (server_id, name, type, position, afk) VALUES (?, 'AWAY', 'voice', 999, 1)").run(sid);
   return sid;
 }
 
@@ -111,6 +112,14 @@ function shownPresence(uid) {
   return p === 'invisible' ? 'offline' : p;
 }
 const presenceMsg = (uid) => { const st = shownPresence(uid); return { t: 'presence', userId: uid, online: st !== 'offline', status: st }; };
+
+// ---------- AWAY channel: inactive people (10 min) are moved here automatically by their app ----------
+try { db.exec('ALTER TABLE channels ADD COLUMN afk INTEGER NOT NULL DEFAULT 0'); } catch { /* exists */ }
+for (const { id } of db.prepare('SELECT id FROM servers').all()) {
+  if (!db.prepare('SELECT 1 FROM channels WHERE server_id=? AND afk=1').get(id)) {
+    db.prepare("INSERT INTO channels (server_id, name, type, position, afk) VALUES (?, 'AWAY', 'voice', 999, 1)").run(id);
+  }
+}
 
 function bootstrap(uid) {
   const row = db.prepare('SELECT * FROM users WHERE id=?').get(uid);

@@ -51,6 +51,8 @@ class VoiceManager {
   spk = new Map(); // identity -> expires at (ms) — instant detection sent by each client
   spkCapable = new Set(); // clients that send instant detection
   localSpeaking = false;
+  joinedAt = null; // when this call started (for the call timer)
+  lastActivity = Date.now(); // last time we talked or touched the app (for the AWAY channel)
   watching = new Set(); // userIds whose screens I'm watching
   settings = loadSettings();
   ping = null;
@@ -123,6 +125,8 @@ class VoiceManager {
         this.error = 'Microphone unavailable (' + micErr.message + '). You joined listen-only.';
       }
       this.status = 'connected';
+      this.joinedAt = Date.now();
+      this.lastActivity = Date.now();
       this.playUiSound('join');
       this.pushState();
       this.emit();
@@ -247,6 +251,7 @@ class VoiceManager {
     try {
       this.stopDetector = startSpeakingDetector(mst, (on) => {
         on = on && !track.isMuted && !this.muted && !this.deafened;
+        if (on) this.lastActivity = Date.now();
         if (on === this.localSpeaking) return;
         this.localSpeaking = on;
         this.sendSpk();
@@ -289,6 +294,7 @@ class VoiceManager {
 
   async setMuted(m) {
     this.muted = m;
+    this.lastActivity = Date.now();
     if (!m && this.deafened) this.setDeafened(false, true);
     const t = this.micTrack();
     if (!m && !t && this.room && this.status === 'connected') {
@@ -518,6 +524,7 @@ class VoiceManager {
     this.stopDetector = null;
     clearInterval(this.spkTimer);
     this.localSpeaking = false;
+    this.joinedAt = null;
     this.spk.clear();
     this.spkCapable.clear();
     this.lkSpeaking = new Set();

@@ -1,3 +1,4 @@
+import { slimeLogo } from './theme';
 import { useState } from 'react';
 import { api, setToken } from './api';
 
@@ -28,7 +29,7 @@ export default function Auth({ onDone }) {
     <div className="auth-page">
       <div className="auth-blobs"><span /><span /><span /></div>
       <form className="auth-card" onSubmit={submit}>
-        <img src="/blob.svg" alt="" className="auth-logo" />
+        <img src={slimeLogo} alt="" className="auth-logo" />
         <h1>{mode === 'login' ? 'Welcome back!' : 'Create an account'}</h1>
         <p className="muted">{mode === 'login' ? 'Log in to Blob to hang out with the crew.' : 'Ask the server owner for the invite code.'}</p>
         <label>Username<input value={username} onChange={(e) => setUsername(e.target.value)} autoFocus required /></label>

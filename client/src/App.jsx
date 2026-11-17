@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { api, connectSocket, setToken } from './api';
 import { voice } from './voice';
 import { Avatar, ContextMenu, Icon, Modal, Slider, Tooltip, useVoice } from './ui';
+import { slimeLogo } from './theme';
 import Chat from './Chat';
 import VoiceView from './VoiceView';
 import { SettingsModal, ShareModal, Soundboard } from './Settings';
@@ -17,6 +18,15 @@ export default function App() {
   const [statusMenu, setStatusMenu] = useState(false);
   const [voiceStates, setVoiceStates] = useState({});
   const [updateReady, setUpdateReady] = useState(false);
+
+  // Any mouse/keyboard use of the app counts as activity (for the AWAY channel).
+  useEffect(() => {
+    let last = 0;
+    const bump = () => { const n = Date.now(); if (n - last > 5000) { last = n; voice.lastActivity = n; } };
+    const evs = ['mousemove', 'mousedown', 'keydown', 'wheel', 'touchstart'];
+    evs.forEach((e) => window.addEventListener(e, bump, { passive: true }));
+    return () => evs.forEach((e) => window.removeEventListener(e, bump));
+  }, []);
   const [messages, setMessages] = useState({});
   const [typing, setTyping] = useState({});
   const [unread, setUnread] = useState(new Set());
@@ -98,6 +108,19 @@ export default function App() {
   }, [servers]);
   stateRef.current = { channelId, me: me?.id, myPresence };
 
+  // Inactive for 10 minutes in a call (not talking, not streaming, not using the app) -> move to AWAY, muted.
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (!voice.channelId || voice.status !== 'connected' || voice.screenStream) return;
+      if (Date.now() - voice.lastActivity < AWAY_AFTER_MS) return;
+      const srv = servers.find((s) => s.id === voice.serverId);
+      const away = srv?.channels.find((c) => c.afk);
+      if (!away || away.id === voice.channelId) return;
+      voice.join(away.id, srv.id).then(() => voice.setMuted(true)).catch(() => {});
+    }, 15000);
+    return () => clearInterval(id);
+  }, [servers]);
+
   useEffect(() => { if (server) localStorage.setItem('blob_server', server.id); }, [server]);
 
   const selectChannel = (c) => {
@@ -115,10 +138,10 @@ export default function App() {
   function notify(msg) {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
     if (stateRef.current.myPresence === 'dnd') return;
-    try { new Notification(msg.username, { body: msg.content || 'Sent a file', icon: '/blob.svg', silent: false }); } catch { /* ignore */ }
+    try { new Notification(msg.username, { body: msg.content || 'Sent a file', icon: slimeLogo, silent: false }); } catch { /* ignore */ }
   }
 
-  if (!data) return <div className="loading"><img src="/blob.svg" alt="" className="loading-blob" /><p>Loading Blob…</p></div>;
+  if (!data) return <div className="loading"><img src={slimeLogo} alt="" className="loading-blob" /><p>Loading Blob…</p></div>;
 
   const voiceChannel = v.channelId ? servers.flatMap((s) => s.channels).find((c) => c.id === v.channelId) : null;
   const voiceServer = v.channelId ? servers.find((s) => s.channels.some((c) => c.id === v.channelId)) : null;
@@ -134,7 +157,7 @@ export default function App() {
       {/* Server bar */}
       <nav className="rail">
         <Tooltip text="Blob" side="right">
-          <div className="rail-item home"><img src="/blob.svg" alt="" /></div>
+          <div className="rail-item home"><img src={slimeLogo} alt="" /></div>
         </Tooltip>
         <div className="rail-sep" />
         {servers.map((s) => (
@@ -170,14 +193,15 @@ export default function App() {
                 </div>
               ))}
               <ChannelGroup title="Voice channels" onAdd={() => setModal({ type: 'addChannel', kind: 'voice' })} />
-              {channels.filter((c) => c.type === 'voice').map((c) => {
+              {channels.filter((c) => c.type === 'voice').sort((x, y) => (x.afk || 0) - (y.afk || 0)).map((c) => {
                 const inCh = Object.entries(voiceStates).filter(([, st]) => st.channelId === c.id);
                 return (
                   <div key={c.id}>
                     <div className={'channel' + (c.id === channelId ? ' active' : '') + (v.channelId === c.id ? ' connected' : '')}
                       onClick={() => joinVoice(c)}
-                      onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, type: 'channel', channel: c }); }}>
-                      <Icon name="speaker" size={20} className="ch-icon" />
+                      onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, type: 'channel', channel: c }); }}
+                      title={c.afk ? 'People inactive for 10 minutes are moved here automatically' : undefined}>
+                      {c.afk ? <span className="ch-icon ch-away">💤</span> : <Icon name="speaker" size={20} className="ch-icon" />}
                       <span>{c.name}</span>
                     </div>
                     {inCh.map(([uid, st]) => {
@@ -212,6 +236,7 @@ export default function App() {
                 <div className={'voice-conn ' + v.status}>
                   <Icon name="sound" size={16} />
                   {v.status === 'connected' ? 'Voice connected' : v.status === 'reconnecting' ? 'Reconnecting…' : 'Connecting…'}
+                  {v.joinedAt && <CallTimer since={v.joinedAt} />}
                   {v.ping != null && <span className="ping">{v.ping} ms</span>}
                 </div>
                 <div className="voice-where" onClick={() => { setServerId(voiceServer.id); selectChannel(voiceChannel); }}>
@@ -289,7 +314,7 @@ export default function App() {
             showMembers={showMembers} toggleMembers={() => setShowMembers((x) => !x)}
             members={showMembers && <MemberList server={server} presence={{ ...presence, [me.id]: myPresence }} voiceStates={voiceStates} onUser={(e, u) => setCtx({ x: e.clientX, y: e.clientY, type: 'user', user: u })} />} />
         ) : (
-          <div className="empty-main"><img src="/blob.svg" alt="" /><p>Create a channel to get started.</p></div>
+          <div className="empty-main"><img src={slimeLogo} alt="" /><p>Create a channel to get started.</p></div>
         )}
       </main>
 
@@ -327,6 +352,17 @@ function ChannelGroup({ title, onAdd }) {
 }
 
 const PRESENCE_LABEL = { online: 'Online', idle: 'Idle', dnd: 'Do Not Disturb', invisible: 'Invisible' };
+const AWAY_AFTER_MS = 10 * 60 * 1000;
+
+function CallTimer({ since }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id); }, []);
+  const s = Math.max(0, Math.floor((now - since) / 1000));
+  const hh = Math.floor(s / 3600), mm = Math.floor((s % 3600) / 60), ss = s % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return <span className="call-timer" title="Time in this call">{hh ? hh + ':' + pad(mm) : mm}:{pad(ss)}</span>;
+}
+
 function MemberList({ server, presence, voiceStates, onUser }) {
   const statusOf = (u) => presence[u.id] || 'offline';
   const isOnline = (u) => !['offline', 'invisible'].includes(statusOf(u));

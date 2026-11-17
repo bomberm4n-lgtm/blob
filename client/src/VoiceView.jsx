@@ -1,3 +1,4 @@
+import { slimeLogo } from './theme';
 import { useEffect, useRef, useState } from 'react';
 import { Track } from 'livekit-client';
 import { voice } from './voice';
@@ -113,7 +114,7 @@ export default function VoiceView({ channel, server, usersById, voiceStates, onJ
         <header className="main-head"><Icon name="speaker" className="ch-icon" /><h3>{channel.name}</h3></header>
         <div className="lobby-body">
           <div className="lobby-avatars">
-            {others.length ? others.map(([uid]) => <Avatar key={uid} user={usersById[uid]} size={64} />) : <img src="/blob.svg" alt="" className="lobby-blob" />}
+            {others.length ? others.map(([uid]) => <Avatar key={uid} user={usersById[uid]} size={64} />) : <img src={slimeLogo} alt="" className="lobby-blob" />}
           </div>
           <h2>{channel.name}</h2>
           <p className="muted">{others.length ? `${others.map(([u]) => usersById[u]?.username).join(', ')} ${others.length > 1 ? 'are' : 'is'} in the call` : 'Nobody is here yet.'}</p>

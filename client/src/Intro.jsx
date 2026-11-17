@@ -4,6 +4,7 @@
 import { useEffect, useRef } from 'react';
 import { playIntroMusic } from './introMusic';
 import { voice } from './voice';
+import { currentPalette } from './theme';
 
 export const INTRO_MS = 6000;
 
@@ -22,13 +23,7 @@ const SLIME = [
   '.osssssssssssso.',
   '..oooooooooooo..',
 ];
-// Saturated color themes; one is picked at random each time the intro plays. The logo follows the same colors.
-const PALETTES = [
-  { o: '#0b3a5c', b: '#4fc8ff', s: '#1f9ee8', h: '#dff6ff', e: '#0b3a5c', logoEdge: '#061a2c' }, // blue
-  { o: '#5c0b14', b: '#ff4d5e', s: '#d6203a', h: '#ffd6db', e: '#5c0b14', logoEdge: '#2a0509' }, // red
-  { o: '#5c470b', b: '#ffd93d', s: '#f0a800', h: '#fff7c8', e: '#5c470b', logoEdge: '#2a2005' }, // yellow
-  { o: '#0b5c2e', b: '#3dff8a', s: '#12c25c', h: '#d6ffe6', e: '#0b5c2e', logoEdge: '#05291a' }, // green
-];
+// The slime's color comes from the session theme (theme.js); the app accent uses the same one.
 
 const BIG = {
   B: ['####.', '#...#', '#...#', '####.', '#...#', '#...#', '####.'],
@@ -78,7 +73,7 @@ export default function Intro({ onDone }) {
     resize();
     window.addEventListener('resize', resize);
 
-    const P = PALETTES[Math.floor(Math.random() * PALETTES.length)];
+    const P = currentPalette();
     const slime = sprite(SLIME, P);
     const slimeBlink = sprite(SLIME, P, true);
     // Soft glow sprite (radial, pre-rendered once) used to make the slime luminous.
@@ -223,8 +218,8 @@ export default function Intro({ onDone }) {
         const n = Math.min(TAGLINE.length, Math.floor((t - 2.9) / 0.045));
         const cw = 4, tw = TAGLINE.length * cw;
         const tx = Math.round(cx - tw / 2), ty = Math.round(ly + 7 * scale + 6);
-        for (let i = 0; i < n; i++) glyph(SMALL[TAGLINE[i]] || SMALL[' '], tx + i * cw, ty, 1, '#3ecf8e', null);
-        if (Math.floor(t * 4) % 2 === 0) px(tx + n * cw, ty, 3, 5, '#3ecf8e');
+        for (let i = 0; i < n; i++) glyph(SMALL[TAGLINE[i]] || SMALL[' '], tx + i * cw, ty, 1, P.b, null);
+        if (Math.floor(t * 4) % 2 === 0) px(tx + n * cw, ty, 3, 5, P.b);
       }
 
       // Sparkles around the logo during the melody.

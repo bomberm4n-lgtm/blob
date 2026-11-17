@@ -4,6 +4,11 @@ import { getToken } from './api';
 import App from './App';
 import Auth from './Auth';
 import Intro from './Intro';
+import { applyAccent, slimeLogo } from './theme';
+
+// Same color as the intro slime, for the whole app.
+applyAccent();
+document.querySelector('link[rel="icon"]')?.setAttribute('href', slimeLogo);
 import './styles.css';
 import './profile.css';
 
