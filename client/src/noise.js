@@ -115,7 +115,9 @@ export class BlobMicProcessor {
 
 // Instant speaking detector: measures the audio that ACTUALLY goes out to others (after suppression/gate).
 // Lights up as soon as there is sound and turns off ~150 ms after it stops.
-export function startSpeakingDetector(mediaStreamTrack, onChange, { thresholdDb = -52, releaseMs = 150 } = {}) {
+// thresholdDb can be a number or a function (read on every check, so slider changes apply instantly).
+export function startSpeakingDetector(mediaStreamTrack, onChange, { thresholdDb = -50, releaseMs = 150 } = {}) {
+  const limit = typeof thresholdDb === 'function' ? thresholdDb : () => thresholdDb;
   const ctx = new AudioContext();
   const an = ctx.createAnalyser();
   an.fftSize = 512;
@@ -130,7 +132,7 @@ export function startSpeakingDetector(mediaStreamTrack, onChange, { thresholdDb 
     for (const v of buf) sum += v * v;
     const db = 20 * Math.log10(Math.sqrt(sum / buf.length) + 1e-9);
     const now = performance.now();
-    if (db > thresholdDb) lastLoud = now;
+    if (db > limit()) lastLoud = now;
     const next = now - lastLoud < releaseMs;
     if (next !== on) { on = next; onChange(on); }
   }, 20);

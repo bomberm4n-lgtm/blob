@@ -564,3 +564,4 @@ kbd { background: var(--bg-0); padding: 4px 10px; border-radius: 6px; font-famil
 .mic-meter-row b { font-variant-numeric: tabular-nums; text-align: right; color: var(--text); font-weight: 600; }
 .meter-fill.raw { background: var(--text-3); }
 .meter-fill.live { box-shadow: 0 0 8px var(--accent); }
+.mic-meter-row b.talking { color: var(--accent); }

@@ -263,7 +263,7 @@ class VoiceManager {
         this.localSpeaking = on;
         this.sendSpk();
         this.updateSpeaking();
-      });
+      }, { thresholdDb: () => this.settings.gateDb ?? -50 }); // same threshold as the slider in Voice settings
     } catch (err) { console.warn('speaking detector failed', err); }
     clearInterval(this.spkTimer);
     this.spkTimer = setInterval(() => {
