@@ -22,7 +22,13 @@ const SLIME = [
   '.osssssssssssso.',
   '..oooooooooooo..',
 ];
-const SLIME_COLORS = { o: '#1b4a5e', b: '#8ed8f5', s: '#5cb6df', h: '#e6f8ff', e: '#1b4a5e' };
+// Saturated color themes; one is picked at random each time the intro plays. The logo follows the same colors.
+const PALETTES = [
+  { o: '#0b3a5c', b: '#4fc8ff', s: '#1f9ee8', h: '#dff6ff', e: '#0b3a5c', logoEdge: '#061a2c' }, // blue
+  { o: '#5c0b14', b: '#ff4d5e', s: '#d6203a', h: '#ffd6db', e: '#5c0b14', logoEdge: '#2a0509' }, // red
+  { o: '#5c470b', b: '#ffd93d', s: '#f0a800', h: '#fff7c8', e: '#5c470b', logoEdge: '#2a2005' }, // yellow
+  { o: '#0b5c2e', b: '#3dff8a', s: '#12c25c', h: '#d6ffe6', e: '#0b5c2e', logoEdge: '#05291a' }, // green
+];
 
 const BIG = {
   B: ['####.', '#...#', '#...#', '####.', '#...#', '#...#', '####.'],
@@ -72,11 +78,16 @@ export default function Intro({ onDone }) {
     resize();
     window.addEventListener('resize', resize);
 
-    const slime = sprite(SLIME, SLIME_COLORS);
-    const slimeBlink = sprite(SLIME, SLIME_COLORS, true);
+    const P = PALETTES[Math.floor(Math.random() * PALETTES.length)];
+    const slime = sprite(SLIME, P);
+    const slimeBlink = sprite(SLIME, P, true);
+    // Soft glow sprite (radial, pre-rendered once) used to make the slime luminous.
+    const glowSpr = document.createElement('canvas');
+    glowSpr.width = glowSpr.height = 64;
+    { const g = glowSpr.getContext('2d'); const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32); grd.addColorStop(0, P.b + 'cc'); grd.addColorStop(0.45, P.b + '55'); grd.addColorStop(1, P.b + '00'); g.fillStyle = grd; g.fillRect(0, 0, 64, 64); }
     const r = rng(7);
     const stars = Array.from({ length: 260 }, () => ({ x: r(), y: r() * 0.62, p: r() * 6.28, s: r() < 0.15 ? 2 : 1 }));
-    const parts = Array.from({ length: 28 }, (_, i) => { const a = Math.PI + (i / 27) * Math.PI + (r() - 0.5) * 0.3; const sp = 30 + r() * 60; return { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 10, c: ['#8ed8f5', '#e6f8ff', '#5cb6df', '#ffffff'][i % 4], s: r() < 0.3 ? 2 : 1 }; });
+    const parts = Array.from({ length: 28 }, (_, i) => { const a = Math.PI + (i / 27) * Math.PI + (r() - 0.5) * 0.3; const sp = 30 + r() * 60; return { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 10, c: null, ci: i % 4, s: r() < 0.3 ? 2 : 1 }; });
     const sparkles = Array.from({ length: 26 }, () => ({ x: r(), y: r(), t0: 2.9 + r() * 2.2, life: 0.4 + r() * 0.5 }));
 
     const px = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(Math.round(x), Math.round(y), w, h); };
@@ -164,16 +175,28 @@ export default function Intro({ onDone }) {
       ctx.globalAlpha = 1;
       const blink = (t > 2.55 && t < 2.68) || (t > 4.25 && t < 4.38);
       const dw = Math.round(sw * scX), dh = Math.round(sh * scY);
+      if (t >= 0.3) {
+        const pulse = 0.75 + 0.25 * Math.sin(t * 4);
+        const gx = cx, gy = Math.round(y + sh - dh / 2);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.55 * pulse;
+        ctx.drawImage(glowSpr, gx - dw * 1.4, gy - dh * 1.6, dw * 2.8, dh * 3.2);
+        // light spilling on the grass
+        ctx.globalAlpha = 0.35 * pulse;
+        ctx.drawImage(glowSpr, gx - dw * 1.6, groundY - 6, dw * 3.2, 14);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+      }
       ctx.globalAlpha = 0.35; px(cx - Math.round(dw * 0.4), groundY - 1, Math.round(dw * 0.8), 2, '#000'); ctx.globalAlpha = 1;
       if (t >= 0.3) ctx.drawImage(blink ? slimeBlink : slime, cx - Math.round(dw / 2), Math.round(y + sh - dh), dw, dh);
 
       // Impact: shockwave ring + pixel dust.
       if (shakeT > 0 && shakeT < 0.5) {
         const rad = 4 + shakeT * 90; ctx.globalAlpha = 1 - shakeT / 0.5;
-        for (let a = 0; a < 64; a++) { const an = (a / 64) * Math.PI; px(cx + Math.cos(an) * rad, groundY - Math.sin(an) * rad * 0.35, 1, 1, '#e6f8ff'); px(cx - Math.cos(an) * rad, groundY - Math.sin(an) * rad * 0.35, 1, 1, '#e6f8ff'); }
+        for (let a = 0; a < 64; a++) { const an = (a / 64) * Math.PI; px(cx + Math.cos(an) * rad, groundY - Math.sin(an) * rad * 0.35, 1, 1, P.h); px(cx - Math.cos(an) * rad, groundY - Math.sin(an) * rad * 0.35, 1, 1, P.h); }
         ctx.globalAlpha = 1;
       }
-      if (shakeT > 0 && shakeT < 0.9) parts.forEach((p) => { const k = shakeT; ctx.globalAlpha = 1 - k / 0.9; px(cx + p.vx * k, groundY - 2 + p.vy * k + 120 * k * k, p.s, p.s, p.c); });
+      if (shakeT > 0 && shakeT < 0.9) parts.forEach((p) => { const k = shakeT; ctx.globalAlpha = 1 - k / 0.9; px(cx + p.vx * k, groundY - 2 + p.vy * k + 120 * k * k, p.s, p.s, [P.b, P.h, P.s, '#ffffff'][p.ci]); });
       ctx.globalAlpha = 1;
 
       // Logo letters drop in on each note.
@@ -191,8 +214,8 @@ export default function Intro({ onDone }) {
         glyph(BIG[ch], x, yy, scale, flash ? '#ffffff' : (gx, gy, rows) => {
           const d = shine >= 0 ? Math.abs((x + gx * scale - lx0) / totalW - (shine * 1.6 - 0.3) + gy * 0.04) : 1;
           if (d < 0.07) return '#ffffff';
-          return gy < rows * 0.35 ? '#e6f8ff' : gy < rows * 0.7 ? '#8ed8f5' : '#5cb6df';
-        }, '#0b1a2a');
+          return gy < rows * 0.35 ? P.h : gy < rows * 0.7 ? P.b : P.s;
+        }, P.logoEdge);
       });
 
       // Tagline typed out, with a blinking cursor.
