@@ -52,7 +52,7 @@ export class BlobMicProcessor {
         const [wasmModule] = await Promise.all([getDfModule(), ctx.audioWorklet.addModule('/dfn/worklet.js')]);
         const dfn = new AudioWorkletNode(ctx, 'deepfilternet-processor', {
           numberOfInputs: 1, numberOfOutputs: 1, channelCount: 1, channelCountMode: 'explicit',
-          processorOptions: { wasmModule, attenuationLimit: s.dfAtten ?? 100 },
+          processorOptions: { wasmModule, attenuationLimit: s.dfAtten ?? 60 },
         });
         // The worklet tells us if the AI really started; if not it would pass raw (noisy) audio through.
         const status = await new Promise((resolve) => {
@@ -77,12 +77,21 @@ export class BlobMicProcessor {
       node = this.rnnoise;
     }
     this.preGate = node; // what the noise gate "sees" (after volume + AI)
-    if (s.gateEnabled) {
+    // The gate on top of DeepFilterNet chops words (the AI already silences the gaps), so it's skipped there.
+    if (s.gateEnabled && this.mode !== 'deepfilter') {
       await ctx.audioWorklet.addModule(noiseGateWorkletUrl);
       const gate = new NoiseGateWorkletNode(ctx, { openThreshold: s.gateDb ?? -50, closeThreshold: (s.gateDb ?? -50) - 5, holdMs: 200, maxChannels: 1 });
       node.connect(gate);
       node = gate;
     }
+    // Force true mono: some processors output 2 channels with only the left one filled (left-ear-only audio).
+    // 'discrete' keeps channel 0 only; a mono node then plays in both ears.
+    const mono = ctx.createGain();
+    mono.channelCount = 1;
+    mono.channelCountMode = 'explicit';
+    mono.channelInterpretation = 'discrete';
+    node.connect(mono);
+    node = mono;
     this.out = node; // what everyone else hears
     const dest = ctx.createMediaStreamDestination();
     node.connect(dest);

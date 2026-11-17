@@ -18,6 +18,13 @@ const patches = [
     /this\.#ready = true;(\s*)\} catch \{(\s*)this\.#ready = false;/,
     'this.#ready = true;$1this.port.postMessage({ type: "blob-ready" });$1} catch (e) {$2this.#ready = false;$2this.port.postMessage({ type: "blob-error", message: String((e && e.message) || e) });',
   ],
+  // Choppy audio fix: the original starts playing as soon as 128 samples exist, then runs dry between
+  // 480-sample frames and outputs silence for a quantum (audible "stutter"). Buffer one extra frame first.
+  [/#bypass = false;/, '#bypass = false;\n    #primed = false;'],
+  [
+    /if \(this\.#available\(this\.#writeOut, this\.#readOut\) >= WORKLET_QUANTUM\) \{/,
+    'if (!this.#primed && this.#available(this.#writeOut, this.#readOut) >= this.#frameLength + WORKLET_QUANTUM) this.#primed = true;\n      if (this.#primed && this.#available(this.#writeOut, this.#readOut) >= WORKLET_QUANTUM) {',
+  ],
 ];
 for (const [a, b] of patches) {
   if (!a.test(worklet)) throw new Error('DeepFilterNet worklet changed, patch not applied');

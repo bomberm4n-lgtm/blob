@@ -150,7 +150,7 @@ function VoiceTab() {
       .catch(() => setTesting(false));
     return () => { alive = false; handle?.stop(); testRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [testing, s.inputDevice, s.noise, s.echo, s.agc, s.gateEnabled, gateDbSettled, s.outputDevice]);
+  }, [testing, s.inputDevice, s.noise, s.echo, s.agc, s.gateEnabled, gateDbSettled, s.dfAtten, s.outputDevice]);
   useEffect(() => { testRef.current?.setMonitor(hearMe); }, [hearMe]);
 
   const set = (patch, restart = true) => {
@@ -211,16 +211,26 @@ function VoiceTab() {
           </label>
         ))}
       </div>
+      {s.noise === 'deepfilter' && (
+        <>
+          <Slider label="Noise removal strength" value={s.dfAtten ?? 60} min={10} max={100} suffix=" dB"
+            onChange={(x) => voice.saveSettings({ dfAtten: Math.round(x) })} />
+          <small className="muted">Lower = more natural voice (a little noise may stay). Higher = removes more, but can make your voice choppy.</small>
+          <button className="btn small" onClick={() => voice.restartMic()}>Apply strength</button>
+        </>
+      )}
 
       <div className="toggles">
         <Toggle label="Echo cancellation" checked={s.echo} onChange={(x) => set({ echo: x })} />
         <Toggle label="Automatic gain control" checked={s.agc} onChange={(x) => set({ agc: x })} />
-        <Toggle label="Manual input sensitivity (noise gate)" checked={s.gateEnabled} onChange={(x) => set({ gateEnabled: x })} />
+        <Toggle label="Manual input sensitivity (noise gate)" checked={s.gateEnabled && s.noise !== 'deepfilter'} disabled={s.noise === 'deepfilter'}
+          onChange={(x) => set({ gateEnabled: x })} />
       </div>
-      {s.gateEnabled && (
+      {s.noise === 'deepfilter' && <small className="muted">The noise gate is off with Blob AI Pro: the AI already removes the noise, and the gate on top of it chops your words.</small>}
+      {s.gateEnabled && s.noise !== 'deepfilter' && (
         <Slider label="Noise gate threshold" value={s.gateDb} min={-100} max={0} suffix=" dB" onChange={(x) => voice.saveSettings({ gateDb: x })} />
       )}
-      {s.gateEnabled && <button className="btn small" onClick={() => voice.restartMic()}>Apply threshold</button>}
+      {s.gateEnabled && s.noise !== 'deepfilter' && <button className="btn small" onClick={() => voice.restartMic()}>Apply threshold</button>}
 
       <div className="divider" />
       <h3>Input mode</h3>
@@ -274,11 +284,11 @@ function KeysTab() {
   );
 }
 
-function Toggle({ label, checked, onChange }) {
+function Toggle({ label, checked, onChange, disabled }) {
   return (
-    <label className="toggle-row">
+    <label className="toggle-row" style={disabled ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}>
       <span>{label}</span>
-      <span className={'toggle' + (checked ? ' on' : '')} onClick={(e) => { e.preventDefault(); onChange(!checked); }}><i /></span>
+      <span className={'toggle' + (checked ? ' on' : '')} onClick={(e) => { e.preventDefault(); if (!disabled) onChange(!checked); }}><i /></span>
     </label>
   );
 }
