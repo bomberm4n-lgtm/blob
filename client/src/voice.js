@@ -10,6 +10,7 @@ const defaults = {
   noiseV: 2,
   echo: true, agc: true,
   gateEnabled: false, gateDb: -50,
+  vadAuto: true, // automatic voice detection (noise-floor based)
   inputGain: 1,
   userVolumes: {}, // userId -> 0..2
   userMuted: {}, // userId -> bool (muted just for me)
@@ -263,7 +264,7 @@ class VoiceManager {
         this.localSpeaking = on;
         this.sendSpk();
         this.updateSpeaking();
-      }, { thresholdDb: () => this.settings.gateDb ?? -50 }); // same threshold as the slider in Voice settings
+      }, { thresholdDb: () => this.settings.gateDb ?? -50, auto: () => this.settings.vadAuto !== false }); // same rule as Voice settings
     } catch (err) { console.warn('speaking detector failed', err); }
     clearInterval(this.spkTimer);
     this.spkTimer = setInterval(() => {

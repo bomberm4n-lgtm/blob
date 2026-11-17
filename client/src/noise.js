@@ -115,9 +115,25 @@ export class BlobMicProcessor {
 
 // Instant speaking detector: measures the audio that ACTUALLY goes out to others (after suppression/gate).
 // Lights up as soon as there is sound and turns off ~150 ms after it stops.
+// Automatic voice detection: the background-noise level is the quietest 15% of the last ~3 s of audio
+// (a fan is constant, speech comes and goes). Only sound clearly above it (+12 dB) counts as talking.
+export function createAutoThreshold(windowSize = 150) {
+  const hist = [];
+  return (db) => {
+    hist.push(db);
+    if (hist.length > windowSize) hist.shift();
+    const sorted = [...hist].sort((x, y) => x - y);
+    const floor = sorted[Math.floor(sorted.length * 0.15)];
+    return Math.max(floor + 12, -75);
+  };
+}
+
 // thresholdDb can be a number or a function (read on every check, so slider changes apply instantly).
-export function startSpeakingDetector(mediaStreamTrack, onChange, { thresholdDb = -50, releaseMs = 150 } = {}) {
+// auto(): when true, the threshold comes from the noise-floor tracker instead.
+export function startSpeakingDetector(mediaStreamTrack, onChange, { thresholdDb = -50, releaseMs = 150, auto = () => false } = {}) {
   const limit = typeof thresholdDb === 'function' ? thresholdDb : () => thresholdDb;
+  const autoThr = createAutoThreshold();
+  let warm = 0; // ignore the first ~0.3 s while the noise level is being learned
   const ctx = new AudioContext();
   const an = ctx.createAnalyser();
   an.fftSize = 512;
@@ -132,7 +148,9 @@ export function startSpeakingDetector(mediaStreamTrack, onChange, { thresholdDb 
     for (const v of buf) sum += v * v;
     const db = 20 * Math.log10(Math.sqrt(sum / buf.length) + 1e-9);
     const now = performance.now();
-    if (db > limit()) lastLoud = now;
+    const a = autoThr(db);
+    warm++;
+    if (db > (auto() ? (warm < 15 ? Infinity : a) : limit())) lastLoud = now;
     const next = now - lastLoud < releaseMs;
     if (next !== on) { on = next; onChange(on); }
   }, 20);
@@ -161,7 +179,13 @@ export async function startMicTest(settings, { onLevels, monitor = false, output
   proc.out.connect(mon).connect(ctx.destination);
   if (outputDevice && ctx.setSinkId) ctx.setSinkId(outputDevice).catch(() => {});
   let raf;
-  const tick = () => { onLevels({ raw: db(an.raw), gate: db(an.gate), out: db(an.out), mode: proc.mode }); raf = requestAnimationFrame(tick); };
+  const autoThr = createAutoThreshold();
+  const tick = () => {
+    const out = db(an.out);
+    const auto = autoThr(out);
+    onLevels({ raw: db(an.raw), gate: db(an.gate), out, mode: proc.mode, thr: s.vadAuto === false ? s.gateDb : auto });
+    raf = requestAnimationFrame(tick);
+  };
   tick();
   return {
     mode: proc.mode,

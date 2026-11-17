@@ -190,7 +190,7 @@ function VoiceTab() {
         <div className="mic-meters">
           <div className="mic-meter-row"><span>Microphone (before AI)</span><div className="meter"><div className="meter-fill raw" style={{ width: pct(levels.raw) + '%' }} /></div><b>{Math.round(levels.raw)} dB</b></div>
           <div className="mic-meter-row"><span>After AI</span><div className="meter"><div className="meter-fill" style={{ width: pct(levels.gate) + '%' }} /></div><b>{Math.round(levels.gate)} dB</b></div>
-          <div className="mic-meter-row"><span>What others hear</span><div className="meter"><div className={'meter-fill' + (levels.out > s.gateDb ? ' live' : '')} style={{ width: pct(levels.out) + '%' }} /><div className="meter-gate" style={{ left: gatePct + '%' }} /></div><b className={levels.out > s.gateDb ? 'talking' : ''}>{levels.out > s.gateDb ? '🟢 talking' : 'quiet'}</b></div>
+          <div className="mic-meter-row"><span>What others hear</span><div className="meter"><div className={'meter-fill' + (levels.out > levels.thr ? ' live' : '')} style={{ width: pct(levels.out) + '%' }} /><div className="meter-gate" style={{ left: pct(levels.thr ?? s.gateDb) + '%' }} /></div><b className={levels.out > levels.thr ? 'talking' : ''}>{levels.out > levels.thr ? '🟢 talking' : 'quiet'}</b></div>
           <small className="muted">{MODE_LABEL[levels.mode] || 'Starting…'}{hearMe && ' · use headphones · echo cancellation is paused while you hear yourself (it would cut your own voice)'}</small>
         </div>
       )}
@@ -226,9 +226,12 @@ function VoiceTab() {
           onChange={(x) => set({ gateEnabled: x })} />
       </div>
       {s.noise === 'deepfilter' && <small className="muted">The noise gate is off with Blob AI Pro: the AI already removes the noise, and the gate on top of it chops your words.</small>}
-      <Slider label="Voice detection threshold" value={s.gateDb} min={-100} max={0} suffix=" dB" onChange={(x) => voice.saveSettings({ gateDb: Math.round(x) })} />
+      <Toggle label="Automatic voice detection (recommended)" checked={s.vadAuto !== false} onChange={(x) => voice.saveSettings({ vadAuto: x })} />
+      {s.vadAuto === false && <Slider label="Voice detection threshold" value={s.gateDb} min={-100} max={0} suffix=" dB" onChange={(x) => voice.saveSettings({ gateDb: Math.round(x) })} />}
       <small className="muted">
-        Your green ring lights up only when what others hear goes above this line (applies instantly).
+        {s.vadAuto !== false
+          ? 'Blob learns your background noise and lights your green ring only when you actually talk.'
+          : 'Your green ring lights up only when what others hear goes above this line (applies instantly).'}
         {s.gateEnabled && s.noise !== 'deepfilter' && ' The noise gate also cuts everything below it.'}
       </small>
       {s.gateEnabled && s.noise !== 'deepfilter' && <button className="btn small" onClick={() => voice.restartMic()}>Apply to the noise gate</button>}
