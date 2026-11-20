@@ -54,6 +54,7 @@ class VoiceManager {
   spkCapable = new Set(); // clients that send instant detection
   localSpeaking = false;
   inAway = false; // currently in the AWAY channel (forced mute + deafen)
+  micMode = null; // which processing the call mic really uses: deepfilter | rnnoise | rnnoise-fallback | browser | raw
   joinedAt = null; // when this call started (for the call timer)
   lastActivity = Date.now(); // last time we talked or touched the app (for the AWAY channel)
   watching = new Set(); // userIds whose screens I'm watching
@@ -242,11 +243,20 @@ class VoiceManager {
     });
     if (s.noise === 'rnnoise' || s.noise === 'deepfilter' || s.gateEnabled || s.inputGain !== 1 || s.voiceOnly !== false) {
       try {
+        // LiveKit refuses processors on a track without an AudioContext ("Audio context needs to be set…"),
+        // which used to make every call silently send the RAW microphone (no AI, no voice filter).
+        track.setAudioContext(this.procCtx ||= new AudioContext());
         this.micProcessor = new BlobMicProcessor(s);
         await track.setProcessor(this.micProcessor);
+        this.micMode = this.micProcessor.mode || 'processed';
       } catch (err) {
         console.warn('Audio processor failed, using raw microphone', err);
+        this.micProcessor = null;
+        this.micMode = 'raw';
+        this.error = 'Noise suppression failed to start, sending your raw microphone: ' + (err?.message || err);
       }
+    } else {
+      this.micMode = s.noise === 'browser' ? 'browser' : 'raw';
     }
     await this.local.publishTrack(track, { source: Track.Source.Microphone, dtx: true, red: true, audioPreset: { maxBitrate: 96000 } });
     if (this.muted || this.deafened || s.pttEnabled) await track.mute();

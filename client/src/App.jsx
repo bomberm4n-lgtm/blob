@@ -237,6 +237,7 @@ export default function App() {
                   <Icon name="sound" size={16} />
                   {v.status === 'connected' ? 'Voice connected' : v.status === 'reconnecting' ? 'Reconnecting…' : 'Connecting…'}
                   {v.joinedAt && <CallTimer since={v.joinedAt} />}
+                  {v.micMode && <MicModeBadge mode={v.micMode} />}
                   {v.ping != null && <span className="ping">{v.ping} ms</span>}
                 </div>
                 <div className="voice-where" onClick={() => { setServerId(voiceServer.id); selectChannel(voiceChannel); }}>
@@ -353,6 +354,19 @@ function ChannelGroup({ title, onAdd }) {
 
 const PRESENCE_LABEL = { online: 'Online', idle: 'Idle', dnd: 'Do Not Disturb', invisible: 'Invisible' };
 const AWAY_AFTER_MS = 10 * 60 * 1000;
+
+// Shows what really processes your mic in this call, so a failure is never silent again.
+function MicModeBadge({ mode }) {
+  const info = {
+    deepfilter: ['AI Pro', 'ok', 'Blob AI Pro (DeepFilterNet3) is cleaning your mic'],
+    rnnoise: ['AI Lite', 'ok', 'Blob AI Lite (RNNoise) is cleaning your mic'],
+    'rnnoise-fallback': ['AI Lite', 'warn', 'AI Pro failed on this PC, using AI Lite'],
+    processed: ['Filter', 'ok', 'Voice filter active'],
+    browser: ['System', 'ok', 'System noise suppression'],
+    raw: ['Raw mic', 'bad', 'No noise suppression: your raw microphone is being sent'],
+  }[mode] || [mode, 'ok', mode];
+  return <Tooltip text={info[2]}><span className={'mic-badge ' + info[1]}>{info[0]}</span></Tooltip>;
+}
 
 function CallTimer({ since }) {
   const [now, setNow] = useState(Date.now());

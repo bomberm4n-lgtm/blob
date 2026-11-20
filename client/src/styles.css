@@ -566,3 +566,7 @@ kbd { background: var(--bg-0); padding: 4px 10px; border-radius: 6px; font-famil
 .meter-fill.raw { background: var(--text-3); }
 .meter-fill.live { box-shadow: 0 0 8px var(--accent); }
 .mic-meter-row b.talking { color: var(--accent); }
+.mic-badge { font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: 6px; margin-right: 4px; white-space: nowrap; }
+.mic-badge.ok { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); }
+.mic-badge.warn { background: color-mix(in srgb, var(--yellow) 22%, transparent); color: var(--yellow); }
+.mic-badge.bad { background: color-mix(in srgb, var(--red) 22%, transparent); color: var(--red); }
