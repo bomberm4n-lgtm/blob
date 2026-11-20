@@ -221,7 +221,7 @@ function VoiceTab() {
 
       <div className="toggles">
         <Toggle label="Echo cancellation (turn off if you use headphones)" checked={s.echo} onChange={(x) => set({ echo: x })} />
-        <Toggle label="Automatic gain control" checked={s.agc} onChange={(x) => set({ agc: x })} />
+        <Toggle label="Automatic gain control (can cause volume dips, keep off with Blob AI)" checked={s.agc} onChange={(x) => set({ agc: x })} />
         <Toggle label="Manual input sensitivity (noise gate)" checked={s.gateEnabled && s.noise !== 'deepfilter'} disabled={s.noise === 'deepfilter'}
           onChange={(x) => set({ gateEnabled: x })} />
       </div>

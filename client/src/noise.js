@@ -104,12 +104,12 @@ export class BlobMicProcessor {
         const thr = autoThr(db);
         const now = performance.now();
         if (voice && db > Math.min(thr, -45)) lastVoice = now;
-        const want = now - lastVoice < 400; // keep open through short pauses between words
+        const want = now - lastVoice < 600; // keep open through pauses, weak words and long "ssss"
         if (want !== open) {
           open = want;
           const t = ctx.currentTime;
           vgate.gain.cancelScheduledValues(t);
-          vgate.gain.setTargetAtTime(open ? 1 : 0, t, open ? 0.005 : 0.03);
+          vgate.gain.setTargetAtTime(open ? 1 : 0, t, open ? 0.005 : 0.06); // softer close
         }
       }, 20);
     }
