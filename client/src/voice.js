@@ -205,7 +205,11 @@ class VoiceManager {
         } catch { /* ignore */ }
       })
       .on(RoomEvent.Reconnecting, () => { this.status = 'reconnecting'; e(); })
-      .on(RoomEvent.Reconnected, () => { this.status = 'connected'; e(); })
+      .on(RoomEvent.Reconnected, () => {
+        this.status = 'connected';
+        this.syncMicMute().catch((err) => console.warn('mic mute sync failed', err));
+        e();
+      })
       .on(RoomEvent.Disconnected, () => {
         if (this.room === room) this.leave(true);
       })
@@ -229,12 +233,24 @@ class VoiceManager {
     }, 3000);
   }
 
-  async publishMic() {
+  // Only one mic replacement runs at a time. Overlapping ones used to publish several live mics,
+  // and mute only reached the first of them.
+  publishMic() {
+    const room = this.room;
+    if (!room) return Promise.resolve();
+    const id = (room.blobMicRequest = (room.blobMicRequest || 0) + 1);
+    const run = (room.blobMicQueue || Promise.resolve())
+      .catch(() => {}) // a failed replacement must not block the next one
+      .then(() => (this.room === room && room.blobMicRequest === id ? this.replaceMic(room) : undefined));
+    room.blobMicQueue = run;
+    return run;
+  }
+
+  async replaceMic(room) {
     const s = this.settings;
-    const old = this.local.getTrackPublication(Track.Source.Microphone);
-    if (old?.track) {
-      await this.local.unpublishTrack(old.track, true);
-    }
+    const local = room.localParticipant; // not this.local: that changes when switching channels mid-way
+    await this.removeMics(local);
+    if (this.room !== room) return;
     const track = await createLocalAudioTrack({
       deviceId: s.inputDevice || undefined,
       echoCancellation: s.echo,
@@ -259,9 +275,40 @@ class VoiceManager {
     } else {
       this.micMode = s.noise === 'browser' ? 'browser' : 'raw';
     }
-    await this.local.publishTrack(track, { source: Track.Source.Microphone, dtx: true, red: true, audioPreset: { maxBitrate: 96000 } });
-    if (this.muted || this.deafened || s.pttEnabled) await track.mute();
+    if (this.room !== room) return track.stop(); // left or switched channel while the mic was starting
+    this.pendingMic = track; // so pressing mute while it's being published still reaches it
+    try {
+      if (this.micShouldBeMuted()) await track.mute(); // before publishing, so a muted mic never leaks a moment of audio
+      await local.publishTrack(track, { source: Track.Source.Microphone, dtx: true, red: true, audioPreset: { maxBitrate: 96000 } });
+      if (this.room !== room) return track.stop();
+      await this.removeMics(local, track);
+      await this.syncMicMute();
+    } catch (err) {
+      track.stop();
+      throw err;
+    } finally {
+      if (this.pendingMic === track) this.pendingMic = null;
+    }
     this.startLocalDetector(track);
+  }
+
+  async removeMics(local, keep) {
+    for (const pub of [...local.trackPublications.values()]) {
+      if (pub.source === Track.Source.Microphone && pub.track && pub.track !== keep) await local.unpublishTrack(pub.track, true);
+    }
+  }
+
+  micShouldBeMuted() {
+    return !!(this.muted || this.deafened || (this.settings.pttEnabled && !this.pttActive));
+  }
+
+  // Applies the current mute / deafen / push-to-talk state to EVERY mic track.
+  async syncMicMute() {
+    const tracks = new Set(this.pendingMic ? [this.pendingMic] : []);
+    for (const pub of this.local?.trackPublications.values() || []) {
+      if (pub.source === Track.Source.Microphone && pub.track) tracks.add(pub.track);
+    }
+    await Promise.all([...tracks].map((t) => (this.micShouldBeMuted() ? t.mute() : t.unmute())));
   }
 
   // ---------- Speaking indicator (green ring) ----------
@@ -321,7 +368,7 @@ class VoiceManager {
     if (!m && !t && this.room && this.status === 'connected') {
       try { await this.publishMic(); this.error = null; } catch (e) { this.muted = true; this.error = 'Microphone unavailable: ' + e.message; this.emit(); return; }
     }
-    if (t && !this.settings.pttEnabled) m ? await t.mute() : await t.unmute();
+    await this.syncMicMute();
     this.playUiSound(m ? 'mute' : 'unmute');
     this.pushState();
     this.emit();
@@ -331,8 +378,7 @@ class VoiceManager {
     if (!d && this.inAway) return; // can't undeafen while in AWAY (leave the channel to come back)
     this.deafened = d;
     for (const p of this.room?.remoteParticipants.values() || []) this.applyVolume(p);
-    const t = this.micTrack();
-    if (t && !this.settings.pttEnabled) (d || this.muted) ? await t.mute() : await t.unmute();
+    await this.syncMicMute();
     if (!silent) this.playUiSound(d ? 'mute' : 'unmute');
     this.pushState();
     this.emit();
@@ -341,16 +387,14 @@ class VoiceManager {
   // Push-to-talk
   async pttDown() {
     if (!this.settings.pttEnabled || this.muted || this.deafened) return;
-    const t = this.micTrack();
-    if (t?.isMuted) await t.unmute();
     this.pttActive = true;
+    await this.syncMicMute();
     this.emit();
   }
   async pttUp() {
     if (!this.settings.pttEnabled) return;
-    const t = this.micTrack();
-    if (t && !t.isMuted) await t.mute();
     this.pttActive = false;
+    await this.syncMicMute();
     this.emit();
   }
 
@@ -361,6 +405,10 @@ class VoiceManager {
     const v = muted ? 0 : this.settings.userVolumes[id] ?? 1;
     const sv = this.deafened ? 0 : this.settings.streamVolumes[id] ?? 1;
     try { p.setVolume(v, Track.Source.Microphone); } catch { /* ignore */ }
+    // setVolume above only reaches the first mic; deafen and mute must silence any duplicate too.
+    for (const pub of p.trackPublications.values()) {
+      if (pub.source === Track.Source.Microphone) pub.track?.setVolume?.(v);
+    }
     try { p.setVolume(sv, Track.Source.ScreenShareAudio); } catch { /* ignore */ }
   }
 
