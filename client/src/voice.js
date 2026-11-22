@@ -1,6 +1,7 @@
 // Manages the voice connection (LiveKit): microphone, screen, camera, soundboard and per-user volumes.
 import { Room, RoomEvent, Track, createLocalAudioTrack, createLocalVideoTrack, VideoPresets } from 'livekit-client';
 import { api } from './api';
+import { screenAudioExcludesBlob } from './screenAudio';
 import { BlobMicProcessor, startSpeakingDetector, preloadDeepFilter } from './noise';
 
 const SETTINGS_KEY = 'blob_settings';
@@ -426,7 +427,13 @@ class VoiceManager {
       scalabilityMode: o.codec === 'vp9' || o.codec === 'av1' ? 'L1T3' : undefined,
       backupCodec: false,
     });
-    const at = stream.getAudioTracks()[0];
+    let at = stream.getAudioTracks()[0];
+    if (at && !screenAudioExcludesBlob(at.getSettings(), vt.getSettings())) {
+      at.stop();
+      stream.removeTrack(at);
+      at = null;
+      this.error = "Streaming without PC audio: here it would send everyone's voices back as an echo. PC audio needs the Windows app 0.2 or newer.";
+    }
     if (at) {
       await this.local.publishTrack(at, { source: Track.Source.ScreenShareAudio, dtx: false, red: false, audioPreset: { maxBitrate: 192000 }, forceStereo: true });
     }
